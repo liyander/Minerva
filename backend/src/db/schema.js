@@ -481,7 +481,6 @@ export const EXPECTED_TABLES = [
   ...TRAINING_TABLES,
   ...COMMUNITY_TABLES,
   ...PLATFORM_TABLES,
-  ...FEATURE_TABLES,
 ]
 
 // Additive migrations for databases created by older versions.
