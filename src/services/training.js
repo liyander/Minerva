@@ -31,8 +31,24 @@ export const updateAssessment = (id, payload) =>
 export const deleteAssessment = (id) => apiFetch(`/assessments/${id}`, { method: 'DELETE' })
 export const saveAssessmentQuestions = (id, questions) =>
   apiFetch(`/assessments/${id}/questions`, { method: 'PUT', ...json({ questions }) })
-export const submitAssessment = (id, answers, paper) =>
-  apiFetch(`/assessments/${id}/attempts`, { method: 'POST', ...json({ answers, paper }) })
+export const startAssessment = (id, password = '') =>
+  apiFetch(`/assessments/${id}/start`, { method: 'POST', ...json({ password }) })
+export const autosaveAssessment = (attemptId, answers, flagged) =>
+  apiFetch(`/assessments/attempts/${attemptId}/autosave`, { method: 'PATCH', ...json({ answers, flagged }) })
+export const submitAssessment = (attemptId, answers) =>
+  apiFetch(`/assessments/attempts/${attemptId}/submit`, { method: 'POST', ...json({ answers }) })
+export const runAssessmentCode = (attemptId, questionId, language, code) =>
+  apiFetch(`/assessments/attempts/${attemptId}/run-code`, { method: 'POST', ...json({ questionId, language, code }) })
+export const recordAssessmentSecurityEvent = (attemptId, type, details = {}) =>
+  apiFetch(`/assessments/attempts/${attemptId}/security-events`, { method: 'POST', ...json({ type, details }) })
+export const fetchAssessmentTargetUsers = (classroomId) =>
+  apiFetch(`/assessments/target-users${classroomId ? `?classroomId=${classroomId}` : ''}`)
+export const generateAssessmentQuestions = (payload) =>
+  apiFetch('/assessments/ai/generate', { method: 'POST', ...json(payload) })
+export const saveAssessmentOverride = (id, userId, payload) =>
+  apiFetch(`/assessments/${id}/overrides/${userId}`, { method: 'PUT', ...json(payload) })
+export const gradeAssessmentQuestion = (attemptId, questionId, payload) =>
+  apiFetch(`/assessments/attempts/${attemptId}/grades/${questionId}`, { method: 'PUT', ...json(payload) })
 export const fetchMyAttempts = () => apiFetch('/assessments/attempts/me')
 export const fetchAssessmentResults = (id) => apiFetch(`/assessments/${id}/results`)
 

@@ -25,12 +25,6 @@ This file is the implementation tracker for the next platform features.
 
 ## Streams and learning models
 
-- [ ] **Stream and department management**
-  - Create and manage streams such as engineering, medicine, commerce, arts, law, and design.
-  - Support custom streams, departments, subjects, and stream-specific terminology.
-  - Associate courses, learning paths, trainers, cohorts, resources, and competencies with one or more streams.
-  - Let trainees select or be assigned a primary stream while permitting cross-stream learning.
-  - Provide stream filters and stream-level reporting throughout the platform.
 
 - [ ] **Flexible practical activities**
   - Replace domain-specific lab assumptions with a reusable activity model.

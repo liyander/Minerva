@@ -1,269 +1,35 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { fetchAssessment, submitAssessment } from '../services/training'
+import { autosaveAssessment, fetchAssessment, recordAssessmentSecurityEvent, runAssessmentCode, startAssessment, submitAssessment } from '../services/training'
 
 function AssessmentAttemptPage() {
-  const { assessmentId } = useParams()
-  const navigate = useNavigate()
-  const [assessment, setAssessment] = useState(null)
-  const [answers, setAnswers] = useState({})
-  const [result, setResult] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState('')
-  const [secondsLeft, setSecondsLeft] = useState(null)
-  const submitRef = useRef(null)
-
-  useEffect(() => {
-    fetchAssessment(assessmentId)
-      .then((data) => {
-        setAssessment(data)
-        if (data.durationMinutes > 0) setSecondsLeft(data.durationMinutes * 60)
-      })
-      .catch((loadError) => setError(loadError?.message || 'Could not load this assessment.'))
-      .finally(() => setIsLoading(false))
-  }, [assessmentId])
-
-  const handleSubmit = useCallback(async () => {
-    if (isSubmitting || result) return
-
-    setIsSubmitting(true)
-    setError('')
-    try {
-      const paper = (assessment?.questions || []).map((question) => ({
-        questionId: question.id,
-        optionOrder: question.optionOrder,
-      }))
-      setResult(await submitAssessment(assessmentId, answers, paper))
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-    } catch (submitError) {
-      setError(submitError?.message || 'Could not submit your answers.')
-    } finally {
-      setIsSubmitting(false)
-    }
-  }, [answers, assessment, assessmentId, isSubmitting, result])
-
-  submitRef.current = handleSubmit
-
-  // Timed assessments submit themselves when the clock runs out.
-  useEffect(() => {
-    if (secondsLeft === null || result) return undefined
-
-    if (secondsLeft <= 0) {
-      void submitRef.current?.()
-      return undefined
-    }
-
-    const timer = window.setTimeout(() => setSecondsLeft((value) => value - 1), 1000)
-    return () => window.clearTimeout(timer)
-  }, [secondsLeft, result])
-
-  const answeredCount = Object.keys(answers).length
-  const total = assessment?.questions?.length || 0
-  const progress = total ? Math.round((answeredCount / total) * 100) : 0
-
-  const clock = useMemo(() => {
-    if (secondsLeft === null) return null
-    const minutes = Math.floor(secondsLeft / 60)
-    const seconds = secondsLeft % 60
-    return `${minutes}:${String(seconds).padStart(2, '0')}`
-  }, [secondsLeft])
-
-  if (isLoading) {
-    return (
-      <main className="min-h-screen bg-surface flex items-center justify-center pt-24">
-        <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin"></div>
-      </main>
-    )
-  }
-
-  if (!assessment) {
-    return (
-      <main className="min-h-screen bg-surface px-5 pt-28">
-        <div className="mx-auto max-w-2xl rounded-3xl bg-blush p-8 text-center">
-          <p className="font-headline text-lg font-extrabold text-on-blush">
-            {error || 'Assessment not found'}
-          </p>
-          <button
-            className="mt-5 rounded-full bg-surface-container-lowest px-6 py-3 font-headline text-sm font-bold text-on-blush"
-            onClick={() => navigate('/assessments')}
-            type="button"
-          >
-            Back to assessments
-          </button>
-        </div>
-      </main>
-    )
-  }
-
-  const byQuestionId = new Map((result?.breakdown || []).map((row) => [row.questionId, row]))
-
-  return (
-    <main className="min-h-screen bg-surface px-5 py-8 sm:px-8 lg:px-10 pt-24 pb-24 md:pb-10">
-      <div className="mx-auto max-w-3xl space-y-6">
-        <button
-          className="inline-flex items-center gap-1 font-headline text-sm font-bold text-on-surface-variant hover:text-on-surface transition-colors"
-          onClick={() => navigate('/assessments')}
-          type="button"
-        >
-          <span className="material-symbols-outlined text-base">arrow_back</span>
-          All assessments
-        </button>
-
-        {result ? (
-          <section
-            className={`rounded-3xl p-8 text-center ${
-              result.passed ? 'bg-mint text-on-mint' : 'bg-butter text-on-butter'
-            }`}
-          >
-            <span className="material-symbols-outlined text-5xl">
-              {result.passed ? 'verified' : 'refresh'}
-            </span>
-            <h1 className="font-headline text-3xl font-extrabold mt-3">{result.percentage}%</h1>
-            <p className="font-body text-sm opacity-80 mt-2">
-              {result.score} of {result.maxScore} marks ·{' '}
-              {result.passed ? 'You passed' : `Pass mark is ${assessment.passPercentage}%`}
-            </p>
-            <button
-              className="mt-6 rounded-full bg-surface-container-lowest px-6 py-3 font-headline text-sm font-bold hover:opacity-90 transition-opacity"
-              onClick={() => navigate('/assessments')}
-              type="button"
-            >
-              Done
-            </button>
-          </section>
-        ) : (
-          <header className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="font-headline text-xs font-bold text-on-surface-variant">
-                  {assessment.subject}
-                </p>
-                <h1 className="font-headline text-2xl font-extrabold text-on-background mt-1">
-                  {assessment.title}
-                </h1>
-              </div>
-              {clock ? (
-                <span
-                  className={`rounded-full px-4 py-2 font-headline text-sm font-bold shrink-0 ${
-                    secondsLeft < 60 ? 'bg-blush text-on-blush' : 'bg-sky text-on-sky'
-                  }`}
-                >
-                  {clock}
-                </span>
-              ) : null}
-            </div>
-
-            {assessment.description ? (
-              <p className="font-body text-sm text-on-surface-variant mt-3">
-                {assessment.description}
-              </p>
-            ) : null}
-
-            <div className="mt-5">
-              <div className="flex items-center justify-between font-body text-xs text-on-surface-variant mb-2">
-                <span>
-                  {answeredCount} of {total} answered
-                </span>
-                <span>{progress}%</span>
-              </div>
-              <div className="h-2 w-full rounded-full bg-surface-container-high overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-primary transition-[width] duration-500"
-                  style={{ width: `${progress}%` }}
-                ></div>
-              </div>
-            </div>
-          </header>
-        )}
-
-        {error ? (
-          <div className="rounded-2xl bg-blush p-4">
-            <p className="font-body text-sm text-on-blush">{error}</p>
-          </div>
-        ) : null}
-
-        <div className="space-y-4">
-          {assessment.questions.map((question, index) => {
-            const outcome = byQuestionId.get(question.id)
-
-            return (
-              <article className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft" key={question.id}>
-                <div className="flex items-start gap-3">
-                  <span className="rounded-full bg-primary-container text-on-primary-container px-3 py-1 font-headline text-xs font-bold shrink-0">
-                    {index + 1}
-                  </span>
-                  <p className="font-headline text-base font-bold text-on-background">
-                    {question.prompt}
-                  </p>
-                </div>
-
-                <div className="mt-4 space-y-2">
-                  {question.options.map((option, optionIndex) => {
-                    const selected = answers[question.id] === optionIndex
-                    let tone = selected
-                      ? 'border-primary bg-primary-container text-on-primary-container'
-                      : 'border-outline-variant bg-surface-container text-on-surface hover:border-outline'
-
-                    if (outcome) {
-                      if (optionIndex === outcome.correctIndex) {
-                        tone = 'border-transparent bg-mint text-on-mint'
-                      } else if (optionIndex === outcome.chosenIndex) {
-                        tone = 'border-transparent bg-blush text-on-blush'
-                      } else {
-                        tone = 'border-outline-variant bg-surface-container text-on-surface-variant'
-                      }
-                    }
-
-                    return (
-                      <button
-                        className={`w-full rounded-2xl border px-4 py-3 text-left font-body text-sm transition-colors ${tone}`}
-                        disabled={Boolean(result)}
-                        key={optionIndex}
-                        onClick={() =>
-                          setAnswers((current) => ({ ...current, [question.id]: optionIndex }))
-                        }
-                        type="button"
-                      >
-                        <span className="font-headline text-xs font-bold mr-2">
-                          {String.fromCharCode(65 + optionIndex)}
-                        </span>
-                        {option}
-                      </button>
-                    )
-                  })}
-                </div>
-
-                {outcome?.explanation ? (
-                  <p className="font-body text-sm text-on-surface-variant mt-3 rounded-2xl bg-surface-container p-3">
-                    {outcome.explanation}
-                  </p>
-                ) : null}
-              </article>
-            )
-          })}
-        </div>
-
-        {!result ? (
-          <div className="sticky bottom-4 rounded-3xl bg-surface-container-lowest p-4 shadow-card flex flex-wrap items-center justify-between gap-3">
-            <p className="font-body text-sm text-on-surface-variant">
-              {answeredCount < total
-                ? `${total - answeredCount} question${total - answeredCount === 1 ? '' : 's'} left`
-                : 'All questions answered'}
-            </p>
-            <button
-              className="rounded-full px-7 py-3 bg-primary text-on-primary font-headline text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-60"
-              disabled={isSubmitting || answeredCount === 0}
-              onClick={handleSubmit}
-              type="button"
-            >
-              {isSubmitting ? 'Submitting…' : 'Submit answers'}
-            </button>
-          </div>
-        ) : null}
-      </div>
-    </main>
-  )
+  const { assessmentId } = useParams(), navigate = useNavigate()
+  const [meta,setMeta]=useState(null),[session,setSession]=useState(null),[password,setPassword]=useState(''),[answers,setAnswers]=useState({}),[flagged,setFlagged]=useState([]),[current,setCurrent]=useState(0),[result,setResult]=useState(null),[runs,setRuns]=useState({}),[error,setError]=useState(''),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[saved,setSaved]=useState(''),[seconds,setSeconds]=useState(null)
+  const submitRef=useRef(null), sessionRef=useRef(null)
+  useEffect(()=>{fetchAssessment(assessmentId).then(setMeta).catch((e)=>setError(e.message)).finally(()=>setLoading(false))},[assessmentId])
+  const begin=async()=>{setBusy(true);setError('');try{const data=await startAssessment(assessmentId,password);setSession(data);sessionRef.current=data;setMeta(data.assessment);setAnswers(data.answers||{});setFlagged(data.flagged||[]);if(data.expiresAt)setSeconds(Math.max(0,Math.floor((new Date(data.expiresAt).getTime()-Date.now())/1000)))}catch(e){setError(e.message)}finally{setBusy(false)}}
+  useEffect(()=>{if(!session)return undefined;const id=setTimeout(()=>autosaveAssessment(session.attemptId,answers,flagged).then((v)=>setSaved(new Date(v.savedAt).toLocaleTimeString())).catch(()=>setSaved('Save retrying…')),700);return()=>clearTimeout(id)},[answers,flagged,session])
+  const security=useCallback((type)=>{if(sessionRef.current)void recordAssessmentSecurityEvent(sessionRef.current.attemptId,type)},[])
+  useEffect(()=>{const visibility=()=>document.hidden&&security('tab_hidden'),blur=()=>security('window_blur'),copy=()=>security('copy'),paste=()=>security('paste');document.addEventListener('visibilitychange',visibility);window.addEventListener('blur',blur);document.addEventListener('copy',copy);document.addEventListener('paste',paste);return()=>{document.removeEventListener('visibilitychange',visibility);window.removeEventListener('blur',blur);document.removeEventListener('copy',copy);document.removeEventListener('paste',paste)}},[security])
+  const submit=useCallback(async()=>{if(!session||busy||result)return;setBusy(true);setError('');try{setResult(await submitAssessment(session.attemptId,answers));window.scrollTo({top:0,behavior:'smooth'})}catch(e){setError(e.message)}finally{setBusy(false)}},[answers,busy,result,session]);submitRef.current=submit
+  useEffect(()=>{if(seconds===null||result)return undefined;if(seconds<=0){void submitRef.current?.();return undefined}const id=setTimeout(()=>setSeconds((v)=>v-1),1000);return()=>clearTimeout(id)},[seconds,result])
+  const questions=session?.questions||[],question=questions[current],answered=Object.keys(answers).filter((key)=>answers[key]!==''&&answers[key]!=null).length
+  const clock=useMemo(()=>seconds==null?null:`${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`,[seconds])
+  const setAnswer=(value)=>setAnswers((old)=>({...old,[question.questionId]:value}))
+  const runCode=async()=>{const value=answers[question.questionId]||{language:meta.allowedLanguages?.[0]||'javascript',code:question.starterCode||''};setBusy(true);try{const output=await runAssessmentCode(session.attemptId,question.questionId,value.language,value.code);setRuns((old)=>({...old,[question.questionId]:output}))}catch(e){setError(e.message)}finally{setBusy(false)}}
+  if(loading)return <main className="min-h-screen bg-surface flex items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" /></main>
+  if(!meta)return <main className="min-h-screen bg-surface px-5 pt-28"><div className="mx-auto max-w-xl rounded-3xl bg-blush p-8 text-on-blush">{error||'Assessment not found'}</div></main>
+  if(!session)return <main className="min-h-screen bg-surface px-5 pt-24"><div className="mx-auto max-w-2xl space-y-5"><button className="font-headline text-sm font-bold" onClick={()=>navigate('/assessments')}>← All assessments</button><section className="rounded-3xl bg-surface-container-lowest p-8 shadow-soft"><p className="text-xs font-bold text-primary">{meta.kind?.toUpperCase()} · {meta.difficulty}</p><h1 className="mt-2 font-headline text-3xl font-extrabold">{meta.title}</h1><p className="mt-3 text-sm text-on-surface-variant">{meta.description}</p>{meta.instructions?<div className="mt-5 rounded-2xl bg-surface-container p-4 text-sm whitespace-pre-wrap">{meta.instructions}</div>:null}<div className="mt-5 grid grid-cols-2 gap-3 text-sm"><span>{meta.durationMinutes?`${meta.durationMinutes} minutes`:'No time limit'}</span><span>{meta.maxAttempts?`${meta.maxAttempts} attempts`:'Unlimited attempts'}</span><span>Pass: {meta.passPercentage}%</span><span>{meta.totalMarks} marks</span></div>{meta.passwordRequired?<input className="mt-5 w-full rounded-xl bg-surface-container px-4 py-3" onChange={(e)=>setPassword(e.target.value)} placeholder="Assessment password" type="password" value={password}/>:null}<button className="mt-6 rounded-full bg-primary px-7 py-3 font-headline text-sm font-bold text-on-primary disabled:opacity-50" disabled={busy||meta.notYetOpen||meta.closed&&!meta.allowLateSubmission} onClick={begin}>{busy?'Starting…':'Start / resume assessment'}</button></section>{error?<div className="rounded-2xl bg-blush p-4 text-on-blush">{error}</div>:null}</div></main>
+  if(result)return <main className="min-h-screen bg-surface px-5 pt-28"><section className="mx-auto max-w-xl rounded-3xl bg-surface-container-lowest p-8 text-center shadow-soft"><span className="material-symbols-outlined text-5xl">{result.resultReleased?'verified':'schedule'}</span><h1 className="mt-3 font-headline text-3xl font-extrabold">{result.resultReleased?`${result.percentage}%`:'Submitted'}</h1><p className="mt-2 text-sm text-on-surface-variant">{result.status==='pending_review'?'Your descriptive answers are awaiting trainer review.':result.resultReleased?`${result.score} of ${result.maxScore} marks`:'Results will be released by your trainer.'}</p><button className="mt-6 rounded-full bg-primary px-6 py-3 font-bold text-on-primary" onClick={()=>navigate('/assessments')}>Done</button></section></main>
+  return <main className="min-h-screen bg-surface px-4 pb-24 pt-24"><div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[15rem_1fr]"><aside className="rounded-3xl bg-surface-container-lowest p-5 shadow-soft lg:sticky lg:top-24 lg:self-start"><div className="flex justify-between"><b className="font-headline">Questions</b>{clock?<b className={seconds<60?'text-error':'text-primary'}>{clock}</b>:null}</div><div className="mt-4 grid grid-cols-5 gap-2">{questions.map((q,i)=><button className={`h-9 rounded-xl text-xs font-bold ${i===current?'bg-primary text-on-primary':answers[q.questionId]!=null?'bg-mint text-on-mint':'bg-surface-container'} ${flagged.includes(q.questionId)?'ring-2 ring-tertiary':''}`} key={q.questionId} onClick={()=>setCurrent(i)}>{i+1}</button>)}</div><p className="mt-4 text-xs text-on-surface-variant">{answered}/{questions.length} answered · {saved?`Saved ${saved}`:'Autosave on'}</p></aside><div className="space-y-4"><header className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft"><p className="text-xs font-bold text-primary">{meta.subject}</p><h1 className="font-headline text-2xl font-extrabold">{meta.title}</h1></header>{error?<div className="rounded-2xl bg-blush p-4 text-on-blush">{error}</div>:null}{question?<article className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft"><div className="flex items-start justify-between gap-3"><div><span className="rounded-full bg-primary-container px-3 py-1 text-xs font-bold">Question {current+1} · {question.marks} marks</span><h2 className="mt-4 font-headline text-lg font-bold whitespace-pre-wrap">{question.prompt}</h2></div><button className={`rounded-full px-3 py-2 text-xs font-bold ${flagged.includes(question.questionId)?'bg-butter text-on-butter':'bg-surface-container'}`} onClick={()=>setFlagged((old)=>old.includes(question.questionId)?old.filter((id)=>id!==question.questionId):[...old,question.questionId])}>⚑ Flag</button></div><Answer question={question} value={answers[question.questionId]} setValue={setAnswer} languages={meta.allowedLanguages} /><div className="mt-5">{question.questionType==='coding'?<><button className="rounded-full bg-surface-container-high px-5 py-2 text-sm font-bold" disabled={busy} onClick={runCode}>Run visible tests</button>{runs[question.questionId]?.runs?.map((run,i)=><div className={`mt-2 rounded-xl p-3 text-xs ${run.passed?'bg-mint text-on-mint':'bg-blush text-on-blush'}`} key={i}>Test {i+1}: {run.passed?'Passed':'Failed'} · expected {run.expectedOutput}</div>)}</>:null}</div></article>:null}<div className="flex justify-between"><button className="rounded-full bg-surface-container-high px-5 py-3 font-bold disabled:opacity-40" disabled={current===0} onClick={()=>setCurrent((v)=>v-1)}>Previous</button>{current<questions.length-1?<button className="rounded-full bg-primary px-6 py-3 font-bold text-on-primary" onClick={()=>setCurrent((v)=>v+1)}>Next</button>:<button className="rounded-full bg-primary px-6 py-3 font-bold text-on-primary disabled:opacity-50" disabled={busy} onClick={submit}>{busy?'Submitting…':'Submit assessment'}</button>}</div></div></div></main>
 }
 
+function Answer({question,value,setValue,languages=[]}) {
+  const type=question.questionType
+  if(['single_choice','true_false','output_prediction'].includes(type))return <div className="mt-5 space-y-2">{question.options.map((option,i)=><button className={`w-full rounded-2xl border px-4 py-3 text-left text-sm ${Number(value)===i?'border-primary bg-primary-container':'border-outline-variant bg-surface-container'}`} key={i} onClick={()=>setValue(i)}>{String.fromCharCode(65+i)}. {option}</button>)}</div>
+  if(type==='multiple_choice')return <div className="mt-5 space-y-2">{question.options.map((option,i)=><label className="flex gap-3 rounded-2xl bg-surface-container p-3" key={i}><input checked={(value||[]).includes(i)} onChange={()=>setValue((value||[]).includes(i)?value.filter((v)=>v!==i):[...(value||[]),i])} type="checkbox"/>{option}</label>)}</div>
+  if(type==='ordering')return <div className="mt-5"><p className="mb-2 text-xs text-on-surface-variant">Enter option letters in the correct order, separated by commas.</p><input className="w-full rounded-xl bg-surface-container p-3" onChange={(e)=>setValue(e.target.value.split(',').map((v)=>Number(v.trim().toUpperCase().charCodeAt(0)-65)).filter((v)=>v>=0))} placeholder="B, A, C" /></div>
+  if(type==='coding'){const current=value&&typeof value==='object'?value:{language:languages[0]||'javascript',code:question.starterCode||''};return <div className="mt-5 space-y-3"><select className="rounded-xl bg-surface-container p-3" onChange={(e)=>setValue({...current,language:e.target.value})} value={current.language}>{languages.map((lang)=><option key={lang}>{lang}</option>)}</select><textarea className="min-h-72 w-full rounded-2xl bg-[#101827] p-4 font-mono text-sm text-white" onChange={(e)=>setValue({...current,code:e.target.value})} spellCheck="false" value={current.code}/></div>}
+  return <textarea className="mt-5 min-h-36 w-full rounded-2xl bg-surface-container p-4 text-sm" onChange={(e)=>setValue(e.target.value)} placeholder={type==='fill_blank'?'Type your answer':'Write your response'} value={value||''}/>
+}
 export default AssessmentAttemptPage

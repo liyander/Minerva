@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import PageHeader from '../../components/PageHeader'
-import { fetchAssessmentResults } from '../../services/training'
+import { fetchAssessmentResults, gradeAssessmentQuestion, updateAssessment } from '../../services/training'
 
 function AssessmentResultsPage() {
   const { assessmentId } = useParams()
@@ -10,6 +10,7 @@ function AssessmentResultsPage() {
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [reviewAttempt, setReviewAttempt] = useState(null)
+  const [gradeDrafts, setGradeDrafts] = useState({})
 
   useEffect(() => {
     fetchAssessmentResults(assessmentId)
@@ -49,6 +50,8 @@ function AssessmentResultsPage() {
           title={data?.assessment?.title || 'Assessment results'}
         />
 
+        {data?.assessment?.resultsMode === 'manual' ? <button className="rounded-full bg-primary px-5 py-2.5 font-headline text-sm font-bold text-on-primary" onClick={async () => { await updateAssessment(assessmentId, { resultsMode: 'immediate' }); setData((current) => ({ ...current, assessment: { ...current.assessment, resultsMode: 'immediate' } })) }} type="button">Release results now</button> : null}
+
         {error ? (
           <div className="rounded-2xl bg-blush p-4">
             <p className="font-body text-sm text-on-blush">{error}</p>
@@ -62,6 +65,8 @@ function AssessmentResultsPage() {
               { label: 'Trainees', value: summary.uniqueTrainees, accent: 'bg-lavender text-on-lavender' },
               { label: 'Average score', value: `${summary.averagePercentage}%`, accent: 'bg-butter text-on-butter' },
               { label: 'Pass rate', value: `${passRate}%`, accent: 'bg-mint text-on-mint' },
+              { label: 'Pending review', value: summary.pendingReview || 0, accent: 'bg-lavender text-on-lavender' },
+              { label: 'Security events', value: summary.securityEvents || 0, accent: 'bg-blush text-on-blush' },
             ].map((tile) => (
               <div className={`rounded-2xl px-5 py-4 ${tile.accent}`} key={tile.label}>
                 <p className="font-headline text-3xl font-extrabold leading-none">{tile.value}</p>
@@ -133,7 +138,7 @@ function AssessmentResultsPage() {
             <div className="mt-4 space-y-3">
               {(reviewAttempt.paper || []).map((question, index) => {
                 const answer = (reviewAttempt.answers || []).find((item) => Number(item.questionId) === Number(question.questionId))
-                return <article className="rounded-2xl bg-surface-container p-4" key={`${question.questionId}-${index}`}><p className="font-headline text-sm font-extrabold text-on-surface">{index + 1}. {question.prompt}</p><div className="mt-3 space-y-2">{(question.options || []).map((option, optionIndex) => <div className={`rounded-xl px-3 py-2 font-body text-xs ${optionIndex === answer?.correctIndex ? 'bg-mint text-on-mint' : optionIndex === answer?.chosenIndex ? 'bg-blush text-on-blush' : 'bg-surface-container-lowest text-on-surface-variant'}`} key={optionIndex}>{option}{optionIndex === answer?.correctIndex ? ' · correct' : optionIndex === answer?.chosenIndex ? ' · selected' : ''}</div>)}</div></article>
+                return <article className="rounded-2xl bg-surface-container p-4" key={`${question.questionId}-${index}`}><p className="font-headline text-sm font-extrabold text-on-surface">{index + 1}. {question.prompt}</p>{(question.options || []).length ? <div className="mt-3 space-y-2">{question.options.map((option, optionIndex) => <div className={`rounded-xl px-3 py-2 font-body text-xs ${optionIndex === answer?.correctIndex ? 'bg-mint text-on-mint' : optionIndex === answer?.answer ? 'bg-blush text-on-blush' : 'bg-surface-container-lowest text-on-surface-variant'}`} key={optionIndex}>{option}{optionIndex === answer?.correctIndex ? ' · correct' : optionIndex === answer?.answer ? ' · selected' : ''}</div>)}</div> : <div className="mt-3 rounded-xl bg-surface-container-lowest p-3 text-sm whitespace-pre-wrap">{typeof answer?.answer === 'object' ? JSON.stringify(answer.answer, null, 2) : answer?.answer || 'No answer'}</div>}{answer?.pendingReview ? <div className="mt-3 flex gap-2"><input className="w-28 rounded-xl bg-surface-container-lowest px-3 py-2 text-sm" max={answer.maxScore} min="0" onChange={(event) => setGradeDrafts((current) => ({ ...current, [question.questionId]: event.target.value }))} placeholder={`0-${answer.maxScore}`} type="number" value={gradeDrafts[question.questionId] || ''} /><button className="rounded-full bg-primary px-4 py-2 text-xs font-bold text-on-primary" onClick={async () => { await gradeAssessmentQuestion(reviewAttempt.id, question.questionId, { score: Number(gradeDrafts[question.questionId] || 0) }); setReviewAttempt(null); setData(await fetchAssessmentResults(assessmentId)) }} type="button">Save grade</button></div> : null}</article>
               })}
             </div>
           </section>

@@ -670,6 +670,9 @@ export async function applyColumnMigrations(conn) {
   await conn
     .query('ALTER TABLE user_room_docker_instances MODIFY COLUMN host_port INT NULL')
     .catch(() => {})
+  await conn
+    .query('ALTER TABLE assessment_attempts MODIFY COLUMN score DECIMAL(10,2) DEFAULT 0, MODIFY COLUMN max_score DECIMAL(10,2) DEFAULT 0')
+    .catch(() => {})
 
   // Merge duplicate channels created by concurrent first-visit requests.
   // Messages are retained under the oldest channel in each classroom/scope.
