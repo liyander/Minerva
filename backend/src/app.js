@@ -1,5 +1,7 @@
 import cors from 'cors'
 import express from 'express'
+import helmet from 'helmet'
+import rateLimit from 'express-rate-limit'
 import { env } from './config/env.js'
 import { databaseErrorMessage, wrapRouterAsync } from './middleware/asyncRouter.js'
 import authRoutes from './routes/auth.routes.js'
@@ -26,6 +28,13 @@ import assessmentsRoutes from './routes/assessments.routes.js'
 import trainingRoutes from './routes/training.routes.js'
 import adminUsersRoutes from './routes/adminUsers.routes.js'
 import communityRoutes from './routes/community.routes.js'
+import filesRoutes from './routes/files.routes.js'
+import assignmentsRoutes from './routes/assignments.routes.js'
+import questionBanksRoutes from './routes/questionBanks.routes.js'
+import cohortsRoutes from './routes/cohorts.routes.js'
+import complianceRoutes from './routes/compliance.routes.js'
+import learningRoutes from './routes/learning.routes.js'
+import reportsRoutes from './routes/reports.routes.js'
 import publicApiRoutes from './api/publicApi.routes.js'
 
 const app = express()
@@ -44,6 +53,34 @@ const corsOptions = {
   credentials: true,
 }
 
+// Behind a proxy the client IP arrives in X-Forwarded-For; the rate limiter
+// needs this to key on the real caller.
+app.set('trust proxy', 1)
+
+// contentSecurityPolicy is left off: this API serves JSON and presigned
+// redirects, and the SPA is served separately with its own policy.
+app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }))
+
+const windowMs = env.security.rateWindowMinutes * 60 * 1000
+
+// Credential endpoints get a tight budget to blunt brute-force attempts.
+const authLimiter = rateLimit({
+  windowMs,
+  limit: env.security.loginAttemptsPerWindow,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  message: { message: 'Too many attempts. Try again later.' },
+})
+
+const apiLimiter = rateLimit({
+  windowMs,
+  limit: env.security.apiRequestsPerWindow,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { message: 'Too many requests. Slow down and try again.' },
+})
+
 app.use(cors(corsOptions))
 app.options('*', cors(corsOptions))
 app.use('/api/rooms/:id/docker/proxy', express.raw({ type: '*/*', limit: '50mb' }))
@@ -52,6 +89,13 @@ app.use(express.json({ limit: '50mb' }))
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' })
 })
+
+app.use('/api/auth/login', authLimiter)
+app.use('/api/auth/signup', authLimiter)
+app.use('/api/auth/register', authLimiter)
+app.use('/api/auth/forgot-password', authLimiter)
+app.use('/api/auth/reset-password', authLimiter)
+app.use('/api', apiLimiter)
 
 app.use('/api/auth', authRoutes)
 app.use('/api/rooms', roomRoutes)
@@ -77,6 +121,13 @@ app.use('/api/assessments', assessmentsRoutes)
 app.use('/api/training', trainingRoutes)
 app.use('/api/admin', adminUsersRoutes)
 app.use('/api/community', communityRoutes)
+app.use('/api/files', filesRoutes)
+app.use('/api/assignments', assignmentsRoutes)
+app.use('/api/question-banks', questionBanksRoutes)
+app.use('/api/cohorts', cohortsRoutes)
+app.use('/api/compliance', complianceRoutes)
+app.use('/api/learning', learningRoutes)
+app.use('/api/reports', reportsRoutes)
 app.use('/api/public', publicApiRoutes)
 
 // Async handlers reject rather than throw synchronously; wrapping every mounted

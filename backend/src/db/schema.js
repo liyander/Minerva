@@ -5,6 +5,11 @@ import {
   TRAINING_TABLES,
 } from './trainingSchema.js'
 import { COMMUNITY_TABLE_DDL, COMMUNITY_TABLES } from './communitySchema.js'
+import {
+  PLATFORM_COLUMN_MIGRATIONS,
+  PLATFORM_TABLE_DDL,
+  PLATFORM_TABLES,
+} from './platformSchema.js'
 
 // Single source of truth for the database shape. Both the CLI initialiser and
 // the admin "Database" screen build the schema from here, so they can never
@@ -388,7 +393,7 @@ export const FEATURE_TABLES = [
   'top_player_resumes',
 ]
 
-export { TRAINING_TABLES }
+export { TRAINING_TABLES, PLATFORM_TABLES }
 
 export const CORE_TABLES = [
   'users',
@@ -420,6 +425,12 @@ export const CORE_TABLES = [
 ]
 
 export const EXPECTED_TABLES = [...CORE_TABLES, ...TRAINING_TABLES, ...COMMUNITY_TABLES, ...FEATURE_TABLES]
+export const EXPECTED_TABLES = [
+  ...CORE_TABLES,
+  ...TRAINING_TABLES,
+  ...PLATFORM_TABLES,
+  ...FEATURE_TABLES,
+]
 
 // Additive migrations for databases created by older versions.
 const COLUMN_MIGRATIONS = [
@@ -504,12 +515,19 @@ export async function createCoreTables(conn) {
   // Community tables depend on users/classrooms, so they run last.
   await conn.query(COMMUNITY_TABLE_DDL)
   return CORE_TABLES.length + TRAINING_TABLES.length + COMMUNITY_TABLES.length
+  // Platform tables depend on assessments and trainer_library_items in turn.
+  await conn.query(PLATFORM_TABLE_DDL)
+  return CORE_TABLES.length + TRAINING_TABLES.length + PLATFORM_TABLES.length
 }
 
 export async function applyColumnMigrations(conn) {
   const applied = []
 
-  for (const [table, column, definition] of [...COLUMN_MIGRATIONS, ...TRAINING_COLUMN_MIGRATIONS]) {
+  for (const [table, column, definition] of [
+    ...COLUMN_MIGRATIONS,
+    ...TRAINING_COLUMN_MIGRATIONS,
+    ...PLATFORM_COLUMN_MIGRATIONS,
+  ]) {
     try {
       if (await addColumnIfMissing(conn, table, column, definition)) {
         applied.push(`${table}.${column}`)

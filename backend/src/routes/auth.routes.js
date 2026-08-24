@@ -1,8 +1,12 @@
 import bcrypt from 'bcryptjs'
+import crypto from 'node:crypto'
 import { Router } from 'express'
 import { pool } from '../db/pool.js'
 import { authenticate, signToken } from '../middleware/auth.js'
 import { APPROVAL, initialApprovalFor, normaliseRole, ROLES } from '../config/roles.js'
+import { env } from '../config/env.js'
+import { sendMail } from '../services/mailer.js'
+import { recordAudit } from '../services/audit.js'
 
 const router = Router()
 
@@ -264,6 +268,139 @@ router.post('/login', async (req, res) => {
       role,
     },
   })
+})
+
+function hashToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex')
+}
+
+/**
+ * Starts a password reset. The response is deliberately identical whether or not
+ * the address exists, so this cannot be used to enumerate accounts.
+ */
+router.post('/forgot-password', async (req, res) => {
+  const email = String(req.body?.email || '').trim().toLowerCase()
+  const generic = { message: 'If that address has an account, a reset link is on its way.' }
+
+  if (!email) {
+    return res.status(400).json({ message: 'Email is required' })
+  }
+
+  const [rows] = await pool.query(
+    'SELECT id, email, first_name, username FROM users WHERE email = ? AND is_active = true LIMIT 1',
+    [email],
+  )
+
+  if (!rows.length) {
+    return res.json(generic)
+  }
+
+  const user = rows[0]
+  const token = crypto.randomBytes(32).toString('hex')
+  const expiresAt = new Date(Date.now() + env.security.passwordResetMinutes * 60000)
+
+  // Any earlier unused token is invalidated so only the newest link works.
+  await pool.query(
+    'UPDATE password_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE user_id = ? AND used_at IS NULL',
+    [user.id],
+  )
+  await pool.query(
+    'INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)',
+    [user.id, hashToken(token), expiresAt.toISOString().slice(0, 19).replace('T', ' ')],
+  )
+
+  void sendMail({
+    to: user.email,
+    template: 'passwordReset',
+    data: {
+      name: user.first_name || user.username,
+      resetUrl: `${env.appUrl}/reset-password?token=${token}`,
+      expiresMinutes: env.security.passwordResetMinutes,
+    },
+  })
+
+  return res.json(generic)
+})
+
+router.post('/reset-password', async (req, res) => {
+  const token = String(req.body?.token || '')
+  const password = String(req.body?.password || '')
+
+  if (!token || !password) {
+    return res.status(400).json({ message: 'Token and new password are required' })
+  }
+  if (password.length < 8) {
+    return res.status(400).json({ message: 'Password must be at least 8 characters' })
+  }
+
+  const [rows] = await pool.query(
+    `SELECT t.id, t.user_id, u.username
+     FROM password_reset_tokens t
+     JOIN users u ON u.id = t.user_id
+     WHERE t.token_hash = ? AND t.used_at IS NULL AND t.expires_at > CURRENT_TIMESTAMP
+     LIMIT 1`,
+    [hashToken(token)],
+  )
+
+  if (!rows.length) {
+    return res.status(400).json({ message: 'That reset link is invalid or has expired.' })
+  }
+
+  const hash = await bcrypt.hash(password, 10)
+  await pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [hash, rows[0].user_id])
+  await pool.query('UPDATE password_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE id = ?', [
+    rows[0].id,
+  ])
+
+  await recordAudit(req, {
+    action: 'password.reset',
+    entityType: 'user',
+    entityId: rows[0].user_id,
+    summary: `Password reset completed for ${rows[0].username}`,
+  })
+
+  return res.json({ message: 'Your password has been changed. You can sign in now.' })
+})
+
+/** Changing a password while signed in still requires the current one. */
+router.post('/change-password', authenticate, async (req, res) => {
+  const currentPassword = String(req.body?.currentPassword || '')
+  const newPassword = String(req.body?.newPassword || '')
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ message: 'Both the current and new password are required' })
+  }
+  if (newPassword.length < 8) {
+    return res.status(400).json({ message: 'New password must be at least 8 characters' })
+  }
+  if (currentPassword === newPassword) {
+    return res.status(400).json({ message: 'Choose a password different from the current one' })
+  }
+
+  const [rows] = await pool.query('SELECT password_hash FROM users WHERE id = ? LIMIT 1', [
+    req.user.id,
+  ])
+  if (!rows.length) {
+    return res.status(404).json({ message: 'Account not found' })
+  }
+
+  if (!(await bcrypt.compare(currentPassword, rows[0].password_hash))) {
+    return res.status(401).json({ message: 'Your current password is not correct' })
+  }
+
+  await pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [
+    await bcrypt.hash(newPassword, 10),
+    req.user.id,
+  ])
+
+  await recordAudit(req, {
+    action: 'password.changed',
+    entityType: 'user',
+    entityId: req.user.id,
+    summary: 'Password changed by the account holder',
+  })
+
+  return res.json({ message: 'Password updated.' })
 })
 
 router.post('/heartbeat', authenticate, async (req, res) => {

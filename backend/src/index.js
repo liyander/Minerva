@@ -3,13 +3,14 @@ import { env } from './config/env.js'
 import { testConnection, initializeDatabaseIfNeeded } from './db/pool.js'
 import { setupRoomTerminalWebSocket } from './routes/rooms.routes.js'
 import { setupCommunityWebSocket } from './routes/community.routes.js'
+import { startReminderSchedule } from './services/reminders.js'
 
 async function start() {
   try {
     await initializeDatabaseIfNeeded()
     await testConnection()
     const server = app.listen(env.port, env.host, () => {
-      console.log(`✓ Incognitrix backend listening on http://${env.host}:${env.port}`)
+      console.log(`✓ Minerva backend listening on http://${env.host}:${env.port}`)
       console.log(`  Default credentials:`)
       console.log(`    operator01 / RedTeam@123`)
       console.log(`    admin01 / AdminControl@123`)
@@ -17,6 +18,7 @@ async function start() {
 
     setupRoomTerminalWebSocket(server)
     setupCommunityWebSocket(server)
+    startReminderSchedule()
 
     server.on('error', (error) => {
       if (error?.code === 'EADDRINUSE') {

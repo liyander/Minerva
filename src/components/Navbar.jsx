@@ -1,22 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { getCareerPathsData } from '../data/careerPathsData'
-import { getCoursesData } from '../data/coursesData'
 import { apiFetch } from '../services/api'
+import GlobalSearch from './GlobalSearch'
 
 const NOTIFICATIONS_UPDATED_EVENT = 'incognitrix:notifications-updated'
 const NOTIFICATIONS_UPDATED_KEY = 'incognitrix_notifications_updated_at'
 
-function searchableValue(value) {
-  return String(value ?? '').toLowerCase()
-}
-
 function Navbar({ config, isSidebarOpen, onLogout, onToggleSidebar }) {
   const navigate = useNavigate()
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState([])
-  const [showResults, setShowResults] = useState(false)
-  const searchRef = useRef(null)
   const [notifications, setNotifications] = useState([])
   const [showNotifications, setShowNotifications] = useState(false)
   const notificationsRef = useRef(null)
@@ -108,9 +99,6 @@ function Navbar({ config, isSidebarOpen, onLogout, onToggleSidebar }) {
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (searchRef.current && !searchRef.current.contains(e.target)) {
-        setShowResults(false)
-      }
       if (notificationsRef.current && !notificationsRef.current.contains(e.target)) {
         setShowNotifications(false)
       }
@@ -119,81 +107,6 @@ function Navbar({ config, isSidebarOpen, onLogout, onToggleSidebar }) {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
-
-  const handleSearch = (value) => {
-    setSearchQuery(value)
-    
-    if (!value.trim()) {
-      setSearchResults([])
-      setShowResults(false)
-      return
-    }
-
-    const query = value.trim().toLowerCase()
-    const careerPaths = getCareerPathsData()
-    const rooms = getCoursesData()
-
-    const results = []
-
-    // Search in career paths
-    careerPaths.forEach((path) => {
-      if (searchableValue(path.title).includes(query) || searchableValue(path.description).includes(query)) {
-        results.push({
-          type: 'path',
-          id: path.id,
-          title: path.title,
-          description: path.description,
-          icon: 'school',
-        })
-      }
-
-      // Search in modules
-      if (path.modules) {
-        path.modules.forEach((module) => {
-          if (searchableValue(module.title).includes(query) || searchableValue(module.description).includes(query)) {
-            results.push({
-              type: 'module',
-              id: module.id,
-              pathId: path.id,
-              title: module.title,
-              description: module.description,
-              icon: 'layers',
-              pathTitle: path.title,
-            })
-          }
-        })
-      }
-    })
-
-    // Search in rooms
-    rooms.forEach((room) => {
-      if (searchableValue(room.title).includes(query) || searchableValue(room.description).includes(query)) {
-        results.push({
-          type: 'room',
-          id: room.id,
-          slug: room.slug,
-          title: room.title,
-          description: room.description,
-          icon: 'flag',
-        })
-      }
-    })
-
-    setSearchResults(results.slice(0, 8))
-    setShowResults(true)
-  }
-
-  const handleSelectResult = (result) => {
-    if (result.type === 'path') {
-      navigate(`/learn/path/${result.id}`)
-    } else if (result.type === 'module') {
-      navigate(`/learn/path/${result.pathId}/module/${result.id}`)
-    } else if (result.type === 'room') {
-      navigate(`/learn/lesson/${result.slug}`)
-    }
-    setSearchQuery('')
-    setShowResults(false)
-  }
 
   return (
     <>
@@ -243,79 +156,7 @@ function Navbar({ config, isSidebarOpen, onLogout, onToggleSidebar }) {
       </div>
       <div className="flex shrink-0 items-center gap-3 xl:gap-4">
         {config.features.navbarSearch ? (
-          <div ref={searchRef} className="relative hidden 2xl:block">
-            <div className="flex items-center gap-2 px-4 py-2.5 bg-surface-container-lowest border border-outline-variant rounded-full shadow-soft hover:border-outline transition-all duration-200 focus-within:border-primary">
-              <span className="material-symbols-outlined text-on-surface-variant text-lg">search</span>
-              <input
-                type="text"
-                placeholder="Search courses, lessons..."
-                value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
-                onFocus={() => searchQuery && setShowResults(true)}
-                className="bg-transparent outline-none font-body text-sm text-on-background placeholder-neutral-500 w-36 2xl:w-44 font-medium"
-              />
-            </div>
-
-            {/* Search Results Dropdown */}
-            {showResults && searchResults.length > 0 && (
-              <div className="absolute top-full mt-3 w-96 bg-surface-container-lowest border border-primary/20 rounded-xl shadow-2xl z-50 overflow-hidden backdrop-blur-sm">
-                <div className="rounded-lg px-3 py-2 border-b border-primary/10 bg-primary/5">
-                  <p className="text-xs font-headline font-bold text-primary">
-                    Search Results ({searchResults.length})
-                  </p>
-                </div>
-                <div className="max-h-96 overflow-y-auto">
-                  {searchResults.map((result) => (
-                    <button
-                      key={`${result.type}-${result.id}`}
-                      onClick={() => handleSelectResult(result)}
-                      className="rounded-xl w-full text-left px-4 py-3.5 hover:bg-primary/8 transition-colors border-b border-primary/5 last:border-b-0 flex items-start gap-4 group"
-                      type="button"
-                    >
-                      <span className="material-symbols-outlined text-base text-primary flex-shrink-0 mt-0.5 group-hover:scale-110 transition-transform">
-                        {result.icon}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-headline text-sm font-bold text-on-background group-hover:text-primary transition-colors truncate">
-                          {result.title}
-                        </div>
-                        <div className="text-xs text-on-surface-variant truncate mt-1">
-                          {result.type === 'module' ? (
-                            <span className="flex items-center gap-1">
-                              <span className="w-1 h-1 bg-primary/50 rounded-lg"></span>
-                              {result.pathTitle}
-                            </span>
-                          ) : (
-                            <span>{result.description}</span>
-                          )}
-                        </div>
-                        <div className="text-xs font-headline text-primary mt-2 inline-block px-2 py-1 bg-primary/10 rounded">
-                          {result.type === 'path' && 'Learning path'}
-                          {result.type === 'module' && 'Module'}
-                          {result.type === 'room' && 'Lesson'}
-                        </div>
-                      </div>
-                      <span className="material-symbols-outlined text-sm text-primary/40 group-hover:text-primary flex-shrink-0 opacity-0 group-hover:opacity-100 transition-all">
-                        arrow_forward
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {showResults && searchQuery && searchResults.length === 0 && (
-              <div className="absolute top-full mt-3 w-96 bg-surface-container-lowest border border-primary/20 rounded-xl shadow-2xl z-50 p-6 text-center backdrop-blur-sm">
-                <div className="flex flex-col items-center gap-3">
-                  <span className="material-symbols-outlined text-4xl text-neutral-300">search_off</span>
-                  <div>
-                    <p className="text-sm font-headline font-bold text-on-background">No results found</p>
-                    <p className="text-xs text-on-surface-variant mt-1">Try a different course, path or lesson</p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          <GlobalSearch className="hidden 2xl:block" />
         ) : null}
         <div className="hidden lg:flex items-center gap-2 px-4 py-2 bg-butter rounded-full whitespace-nowrap">
           <span className="material-symbols-outlined text-on-butter text-base">local_fire_department</span>

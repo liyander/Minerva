@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { pool } from '../db/pool.js'
 import { authenticate, requireTrainer } from '../middleware/auth.js'
 import { isRole, ROLES } from '../config/roles.js'
+import crypto from 'node:crypto'
 
 const router = Router()
 
@@ -21,6 +22,70 @@ function toMysqlDate(value) {
   if (!value) return null
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 19).replace('T', ' ')
+}
+
+/**
+ * Fisher-Yates using crypto randomness. Question order and option order are
+ * shuffled per attempt so two trainees rarely see the same paper.
+ */
+function shuffle(items) {
+  const copy = [...items]
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = crypto.randomInt(0, i + 1)
+    ;[copy[i], copy[j]] = [copy[j], copy[i]]
+  }
+  return copy
+}
+
+/**
+ * Builds the question set for one attempt. When the assessment is backed by a
+ * question bank a random subset of `draw_count` items is drawn; otherwise its own
+ * questions are used. Returns rows in the shape assessment_questions has, plus
+ * an `optionOrder` mapping when options were shuffled.
+ */
+async function buildAttemptPaper(assessment) {
+  let rows
+
+  if (assessment.bank_id) {
+    const [bankRows] = await pool.query(
+      `SELECT id, prompt, options_json, correct_index, explanation, marks
+       FROM question_bank_items WHERE bank_id = ? ORDER BY id`,
+      [assessment.bank_id],
+    )
+    rows = bankRows
+  } else {
+    const [ownRows] = await pool.query(
+      `SELECT id, prompt, options_json, correct_index, explanation, marks
+       FROM assessment_questions WHERE assessment_id = ? ORDER BY sort_order, id`,
+      [assessment.id],
+    )
+    rows = ownRows
+  }
+
+  const drawCount = Number(assessment.draw_count || 0)
+  if (assessment.shuffle_questions || (assessment.bank_id && drawCount > 0)) {
+    rows = shuffle(rows)
+  }
+  if (drawCount > 0 && drawCount < rows.length) {
+    rows = rows.slice(0, drawCount)
+  }
+
+  return rows.map((row) => {
+    const options = parseOptions(row.options_json)
+
+    if (!assessment.shuffle_options) {
+      return { ...row, options, optionOrder: options.map((_, index) => index) }
+    }
+
+    // optionOrder[displayedIndex] = originalIndex, so grading can map back.
+    const order = shuffle(options.map((_, index) => index))
+    return {
+      ...row,
+      options: order.map((originalIndex) => options[originalIndex]),
+      correctIndex: order.indexOf(Number(row.correct_index)),
+      optionOrder: order,
+    }
+  })
 }
 
 function canManage(user, assessment) {
@@ -142,10 +207,17 @@ router.get('/:id', async (req, res) => {
     return res.status(403).json({ message: 'This assessment is not published yet' })
   }
 
-  const [questions] = await pool.query(
-    'SELECT * FROM assessment_questions WHERE assessment_id = ? ORDER BY sort_order, id',
-    [assessment.id],
-  )
+  // Owners always see the authored list; trainees get the paper they will sit.
+  let questions
+  if (manage) {
+    const [authored] = await pool.query(
+      'SELECT * FROM assessment_questions WHERE assessment_id = ? ORDER BY sort_order, id',
+      [assessment.id],
+    )
+    questions = authored
+  } else {
+    questions = await buildAttemptPaper(assessment)
+  }
 
   return res.json({
     id: assessment.id,
@@ -161,13 +233,18 @@ router.get('/:id', async (req, res) => {
     deadline: assessment.deadline,
     isPublished: Boolean(assessment.is_published),
     canManage: manage,
+    bankId: assessment.bank_id,
+    drawCount: assessment.draw_count,
+    shuffleQuestions: Boolean(assessment.shuffle_questions),
+    shuffleOptions: Boolean(assessment.shuffle_options),
     ...assessmentWindow(assessment),
     questions: questions.map((question) => ({
       id: question.id,
       prompt: question.prompt,
-      options: parseOptions(question.options_json),
+      options: question.options || parseOptions(question.options_json),
       marks: question.marks,
       sortOrder: question.sort_order,
+      ...(question.optionOrder ? { optionOrder: question.optionOrder } : {}),
       ...(manage
         ? { correctIndex: question.correct_index, explanation: question.explanation }
         : {}),
@@ -186,8 +263,9 @@ router.post('/', requireTrainer, async (req, res) => {
   const [result] = await pool.query(
     `INSERT INTO assessments (
       title, description, subject, room_id, created_by, kind,
-      pass_percentage, duration_minutes, max_attempts, opens_at, deadline, is_published
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      pass_percentage, duration_minutes, max_attempts, opens_at, deadline, is_published,
+      bank_id, draw_count, shuffle_questions, shuffle_options
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       title,
       req.body?.description || null,
@@ -201,6 +279,10 @@ router.post('/', requireTrainer, async (req, res) => {
       toMysqlDate(req.body?.opensAt),
       toMysqlDate(req.body?.deadline),
       Boolean(req.body?.isPublished),
+      req.body?.bankId || null,
+      Number(req.body?.drawCount ?? 0),
+      Boolean(req.body?.shuffleQuestions),
+      Boolean(req.body?.shuffleOptions),
     ],
   )
 
@@ -226,6 +308,10 @@ router.put('/:id', requireTrainer, async (req, res) => {
     opens_at: req.body?.opensAt !== undefined ? toMysqlDate(req.body.opensAt) : undefined,
     deadline: req.body?.deadline !== undefined ? toMysqlDate(req.body.deadline) : undefined,
     is_published: req.body?.isPublished,
+    bank_id: req.body?.bankId,
+    draw_count: req.body?.drawCount,
+    shuffle_questions: req.body?.shuffleQuestions,
+    shuffle_options: req.body?.shuffleOptions,
   }
 
   const updates = Object.entries(fields).filter(([, value]) => value !== undefined)
@@ -329,10 +415,47 @@ router.post('/:id/attempts', async (req, res) => {
     }
   }
 
-  const [questions] = await pool.query(
-    'SELECT id, correct_index, explanation, marks FROM assessment_questions WHERE assessment_id = ? ORDER BY sort_order, id',
-    [assessment.id],
-  )
+  // The client echoes back the paper it was shown. Only ids are trusted; the
+  // answer key is always re-read from the database.
+  const paper = Array.isArray(req.body?.paper) ? req.body.paper : null
+  const source = assessment.bank_id ? 'question_bank_items' : 'assessment_questions'
+
+  let questions
+  if (paper?.length) {
+    const ids = paper.map((entry) => Number(entry.questionId)).filter(Number.isFinite)
+    if (!ids.length) {
+      return res.status(400).json({ message: 'The submitted paper is malformed' })
+    }
+
+    const [rows] = await pool.query(
+      `SELECT id, correct_index, explanation, marks FROM ${source} WHERE id IN (?)`,
+      [ids],
+    )
+    const byId = new Map(rows.map((row) => [Number(row.id), row]))
+
+    questions = paper
+      .map((entry) => {
+        const row = byId.get(Number(entry.questionId))
+        if (!row) return null
+        // Map the displayed option index back to the stored one.
+        const order = Array.isArray(entry.optionOrder) ? entry.optionOrder : null
+        return {
+          ...row,
+          displayCorrectIndex: order
+            ? order.indexOf(Number(row.correct_index))
+            : Number(row.correct_index),
+        }
+      })
+      .filter(Boolean)
+  } else {
+    const [rows] = await pool.query(
+      `SELECT id, correct_index, explanation, marks FROM ${source}
+       WHERE ${assessment.bank_id ? 'bank_id' : 'assessment_id'} = ?
+       ORDER BY id`,
+      [assessment.bank_id || assessment.id],
+    )
+    questions = rows.map((row) => ({ ...row, displayCorrectIndex: Number(row.correct_index) }))
+  }
 
   if (!questions.length) {
     return res.status(400).json({ message: 'This assessment has no questions yet' })
@@ -346,13 +469,13 @@ router.post('/:id/attempts', async (req, res) => {
     const marks = Number(question.marks || 1)
     maxScore += marks
     const chosen = Number(submitted[question.id] ?? submitted[String(question.id)] ?? -1)
-    const correct = chosen === Number(question.correct_index)
+    const correct = chosen === Number(question.displayCorrectIndex)
     if (correct) score += marks
 
     return {
       questionId: question.id,
       chosenIndex: Number.isInteger(chosen) && chosen >= 0 ? chosen : null,
-      correctIndex: question.correct_index,
+      correctIndex: question.displayCorrectIndex,
       correct,
       explanation: question.explanation,
     }
