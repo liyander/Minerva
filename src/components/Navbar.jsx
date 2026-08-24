@@ -151,18 +151,18 @@ function Navbar({ config, isSidebarOpen, onLogout, onToggleSidebar }) {
 
   const languages = [
     { code: 'en', name: 'English' },
-    { code: 'hi', name: 'Hindi (हिन्दी)' },
-    { code: 'bn', name: 'Bengali (বাংলা)' },
-    { code: 'te', name: 'Telugu (తెలుగు)' },
-    { code: 'mr', name: 'Marathi (मराठी)' },
-    { code: 'ta', name: 'Tamil (தமிழ்)' },
-    { code: 'gu', name: 'Gujarati (ગુજરાતી)' },
-    { code: 'kn', name: 'Kannada (ಕನ್ನಡ)' },
-    { code: 'ml', name: 'Malayalam (മലയാളം)' },
-    { code: 'pa', name: 'Punjabi (ਪੰਜਾਬੀ)' },
-    { code: 'or', name: 'Odia (ଓଡ଼ିଆ)' },
-    { code: 'as', name: 'Assamese (অসমীয়া)' },
-    { code: 'ur', name: 'Urdu (اردو)' }
+    { code: 'hi', name: 'Hindi' },
+    { code: 'bn', name: 'Bengali' },
+    { code: 'te', name: 'Telugu' },
+    { code: 'mr', name: 'Marathi' },
+    { code: 'ta', name: 'Tamil' },
+    { code: 'gu', name: 'Gujarati' },
+    { code: 'kn', name: 'Kannada' },
+    { code: 'ml', name: 'Malayalam' },
+    { code: 'pa', name: 'Punjabi' },
+    { code: 'or', name: 'Odia' },
+    { code: 'as', name: 'Assamese' },
+    { code: 'ur', name: 'Urdu' }
   ]
 
   return (
@@ -340,7 +340,7 @@ function Navbar({ config, isSidebarOpen, onLogout, onToggleSidebar }) {
             </button>
 
             {showLanguageMenu && (
-              <div className="absolute top-full mt-3 right-0 w-40 bg-surface-container-lowest border border-primary/20 rounded-xl shadow-2xl z-50 overflow-hidden backdrop-blur-sm">
+              <div translate="no" className="notranslate absolute top-full mt-3 right-0 w-40 bg-surface-container-lowest border border-primary/20 rounded-xl shadow-2xl z-50 overflow-hidden backdrop-blur-sm">
                 <div className="rounded-xl px-3 py-2 border-b border-primary/10 bg-primary/5">
                   <p className="text-[11px] font-headline font-bold text-primary uppercase tracking-wider">Language</p>
                 </div>
