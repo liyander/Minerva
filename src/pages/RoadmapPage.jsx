@@ -115,7 +115,7 @@ function buildFallbackModules(rooms) {
     id: `category-${category.toLowerCase().replace(/[^a-z0-9]+/g, '-') || index}`,
     phase: `Track ${String(index + 1).padStart(2, '0')}`,
     title: category,
-    description: `Build capability across ${category.toLowerCase()} rooms.`,
+    description: `Build capability across ${category.toLowerCase()} skills.`,
     rooms: roomIds,
   }))
 }
@@ -196,7 +196,7 @@ function RoadmapPage() {
       : [{
           id: 'all-rooms',
           title: 'Course Catalogue',
-          description: 'A generated roadmap from all available academy rooms.',
+          description: 'A generated roadmap from all available academy skills.',
           modules: buildFallbackModules(rooms),
         }]
 
@@ -402,7 +402,7 @@ function RoadmapPage() {
                 {linkedPath.title}
               </h4>
               <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-on-surface-variant">
-                {linkedPath.description || `${linkedPath.completedRooms}/${linkedPath.totalRooms} rooms mapped in this sub-path.`}
+                {linkedPath.description || `${linkedPath.completedRooms}/${linkedPath.totalRooms} skills mapped in this sub-path.`}
               </p>
             </div>
             <div className="shrink-0 text-right">
@@ -465,7 +465,7 @@ function RoadmapPage() {
               Minerva Roadmap
             </h1>
             <p className="mx-auto mt-5 max-w-3xl text-base font-medium leading-relaxed text-on-surface-variant sm:text-lg">
-              A live mission route built from academy rooms, career paths, Docker/practical labs, and your completion state.
+              A live mission route built from academy skills, career paths, practical labs, and your completion state.
             </p>
           </header>
 
@@ -588,7 +588,7 @@ function RoadmapPage() {
                             </div>
                             <div className="flex min-w-0 flex-1 flex-col justify-center p-4 pr-14">
                               <p className="font-headline text-xs font-bold text-primary">
-                                {module.phase || `Module ${String(moduleIndex + 1).padStart(2, '0')}`} / {module.rooms.length} rooms
+                                {module.phase || `Module ${String(moduleIndex + 1).padStart(2, '0')}`} / {module.rooms.length} skills
                               </p>
                               <h4 className="mt-1 line-clamp-2 font-headline text-sm font-extrabold tracking-wide text-on-background">
                                 {module.title}
@@ -649,7 +649,7 @@ function RoadmapPage() {
                         {column.title}
                       </h3>
                       <p className="mx-auto mt-2 line-clamp-3 max-w-xs text-sm leading-relaxed text-on-surface-variant">
-                        {column.description || `${column.completedRooms}/${column.totalRooms} rooms completed in this specialization.`}
+                        {column.description || `${column.completedRooms}/${column.totalRooms} skills completed in this specialization.`}
                       </p>
                       <div className="rounded-xl mt-4 h-1.5 bg-surface-container-high">
                         <div className="h-full bg-secondary" style={{ width: `${column.pathCompletion}%` }}></div>
@@ -709,7 +709,7 @@ function RoadmapPage() {
                                     {module.phase || `Module ${String(moduleIndex + 1).padStart(2, '0')}`}
                                   </span>
                                   <span className="rounded-lg max-w-full truncate bg-primary/10 px-3 py-1 font-headline text-sm font-bold text-primary">
-                                    {module.rooms.length} rooms
+                                    {module.rooms.length} skills
                                   </span>
                                   {module.description ? (
                                     <span className="rounded-lg max-w-full truncate bg-primary/10 px-3 py-1 font-headline text-sm font-bold text-primary">
@@ -751,7 +751,7 @@ function RoadmapPage() {
               </div>
               {columns.length === 0 ? (
                 <div className="rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-8 text-center text-on-surface-variant">
-                  No rooms are available for a roadmap yet.
+                  No skills are available for a roadmap yet.
                 </div>
               ) : null}
               <div className="rounded-xl mx-auto mt-10 hidden h-12 w-[3px] bg-secondary/65 shadow-[0_0_18px_rgba(102,217,239,0.18)] lg:block"></div>
@@ -765,7 +765,7 @@ function RoadmapPage() {
                 <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
                   {nextRoom
                     ? nextRoom.description
-                    : 'Every mapped room is complete. Watch for new missions from the academy.'}
+                    : 'Every mapped skill is complete. Watch for new learning from the academy.'}
                 </p>
                 {nextRoom ? (
                   <Link

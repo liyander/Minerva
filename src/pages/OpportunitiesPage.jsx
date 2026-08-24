@@ -94,7 +94,7 @@ function OpportunitiesPage() {
     try {
       const refreshed = await apiFetch('/jobs/recommendations/refresh', { method: 'POST' })
       setRecommendations(Array.isArray(refreshed) ? refreshed : [])
-      setMessage('Recommendations refreshed from saved settings and completed rooms.')
+      setMessage('Recommendations refreshed from saved settings and completed skills.')
     } catch (refreshError) {
       setError(refreshError?.message || 'Unable to refresh recommendations.')
     } finally {
@@ -156,7 +156,7 @@ function OpportunitiesPage() {
                 Job Updates
               </h1>
               <p className="mt-4 max-w-3xl text-sm leading-relaxed text-on-surface-variant">
-                Jobs are matched against your saved settings, completed rooms, projects, achievements, certificates, internships, tools, and skills. Update your evidence in Settings, then refresh this feed.
+                Jobs are matched against your saved settings, completed skills, projects, achievements, certificates, internships, tools, and evidence. Update your evidence in Settings, then refresh this feed.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3 sm:min-w-80">

@@ -40,7 +40,7 @@ router.delete('/:name', authenticate, requireAdmin, async (req, res) => {
   const [[usage]] = await pool.query('SELECT COUNT(*) AS count FROM rooms WHERE category = ?', [name])
   if (Number(usage?.count || 0) > 0) {
     return res.status(409).json({
-      message: `Category "${name}" is assigned to ${Number(usage.count)} room(s). Reassign those rooms before deleting it.`,
+      message: `Category "${name}" is assigned to ${Number(usage.count)} skill(s). Reassign those skills before deleting it.`,
       assignedRooms: Number(usage.count),
     })
   }

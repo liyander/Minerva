@@ -698,7 +698,7 @@ function scoreJob(job, evidence) {
     topReasons.push('Internship experience improves readiness for entry-level screening.')
   }
   if (!topReasons.length) {
-    topReasons.push('Add skills, projects, internships, and completed rooms to improve match quality.')
+    topReasons.push('Add declared skills, projects, internships, and completed learning skills to improve match quality.')
   }
 
   const aiAnalysis = [
@@ -709,7 +709,7 @@ function scoreJob(job, evidence) {
     missingSkills.length
       ? `Improve next: add evidence for ${missingSkills.slice(0, 5).join(', ')}.`
       : 'The listed skills are well covered by the current profile.',
-    'The recommendation considers completed rooms, certificates, internships, projects, achievements, and the saved student skill profile.',
+    'The recommendation considers completed learning skills, certificates, internships, projects, achievements, and the saved student skill profile.',
   ].join(' ')
 
   return {

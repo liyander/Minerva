@@ -8,6 +8,17 @@ import {
   starterNotifications,
   starterResources,
 } from '../seed/starterContent.js'
+import {
+  departmentCareerPaths,
+  departmentCategories,
+  departmentCourses,
+  departmentResources,
+} from '../seed/departmentContent.js'
+
+const allCategories = [...new Set([...starterCategories, ...departmentCategories])]
+const allCourses = [...starterCourses, ...departmentCourses]
+const allCareerPaths = [...starterCareerPaths, ...departmentCareerPaths]
+const allResources = [...starterResources, ...departmentResources]
 
 async function countRows(conn, table) {
   try {
@@ -68,12 +79,9 @@ async function seedPlatformConfig(conn, force) {
 async function seedCategories(conn, force) {
   const existing = await countRows(conn, 'room_categories')
   if (existing === null) return { table: 'room_categories', skipped: 'table missing', inserted: 0 }
-  if (existing > 0 && !force) {
-    return { table: 'room_categories', skipped: 'already has rows', inserted: 0 }
-  }
 
   let inserted = 0
-  for (const name of starterCategories) {
+  for (const name of allCategories) {
     const [result] = await conn.query(
       'INSERT INTO room_categories (name) VALUES (?) ON DUPLICATE KEY UPDATE name = name',
       [name],
@@ -87,10 +95,9 @@ async function seedCategories(conn, force) {
 async function seedCourses(conn, force) {
   const existing = await countRows(conn, 'rooms')
   if (existing === null) return { table: 'rooms', skipped: 'table missing', inserted: 0 }
-  if (existing > 0 && !force) return { table: 'rooms', skipped: 'already has rows', inserted: 0 }
 
   let inserted = 0
-  for (const course of starterCourses) {
+  for (const course of allCourses) {
     const [result] = await conn.query(
       `INSERT INTO rooms (
         id, slug, category, level, level_tone, dot_tone, title, description, xp,
@@ -145,12 +152,9 @@ async function seedCourses(conn, force) {
 async function seedCareerPaths(conn, force) {
   const existing = await countRows(conn, 'career_paths')
   if (existing === null) return { table: 'career_paths', skipped: 'table missing', inserted: 0 }
-  if (existing > 0 && !force) {
-    return { table: 'career_paths', skipped: 'already has rows', inserted: 0 }
-  }
 
   let inserted = 0
-  for (const path of starterCareerPaths) {
+  for (const path of allCareerPaths) {
     const [result] = await conn.query(
       `INSERT INTO career_paths (
         id, slug, title, description, icon, learning_path_level,
@@ -215,10 +219,9 @@ async function seedCareerPaths(conn, force) {
 async function seedResources(conn, force) {
   const existing = await countRows(conn, 'cves')
   if (existing === null) return { table: 'cves', skipped: 'table missing', inserted: 0 }
-  if (existing > 0 && !force) return { table: 'cves', skipped: 'already has rows', inserted: 0 }
 
   let inserted = 0
-  for (const resource of starterResources) {
+  for (const resource of allResources) {
     const [result] = await conn.query(
       `INSERT INTO cves (
         cve_id, short_description, found_year, credit,

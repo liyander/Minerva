@@ -22,6 +22,7 @@ import {
 
 const NOTIFICATIONS_UPDATED_EVENT = 'incognitrix:notifications-updated'
 const NOTIFICATIONS_UPDATED_KEY = 'incognitrix_notifications_updated_at'
+const COURSE_PREVIEW_LIMIT = 4
 
 // Rotated across the progress tiles so a long list of topics stays varied.
 const TOPIC_ACCENTS = [
@@ -82,6 +83,7 @@ function DashboardPage() {
   const [isSavingRegistration, setIsSavingRegistration] = useState(false)
   const [activityQuery, setActivityQuery] = useState('')
   const [courseQuery, setCourseQuery] = useState('')
+  const [isCourseModalOpen, setIsCourseModalOpen] = useState(false)
   const [topicOffset, setTopicOffset] = useState(0)
   const [selectedDate, setSelectedDate] = useState(() => new Date())
   const [dashboardStats, setDashboardStats] = useState({
@@ -109,6 +111,20 @@ function DashboardPage() {
       window.removeEventListener('storage', onStorage)
     }
   }, [])
+
+  useEffect(() => {
+    if (!isCourseModalOpen) return undefined
+    const previousOverflow = document.body.style.overflow
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setIsCourseModalOpen(false)
+    }
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [isCourseModalOpen])
 
   useEffect(() => {
     let cancelled = false
@@ -458,6 +474,7 @@ function DashboardPage() {
           String(course.category || '').toLowerCase().includes(query),
       )
   }, [courses, courseProgressMap, courseQuery])
+  const previewCourseItems = courseItems.slice(0, COURSE_PREVIEW_LIMIT)
 
   const handleResumeLearning = () => {
     if (!activePathProgress?.path || !nextResumeModule?.id) {
@@ -521,6 +538,47 @@ function DashboardPage() {
 
   return (
     <div className="mt-16 md:mt-20 p-4 sm:p-6 lg:p-8">
+      {isCourseModalOpen ? (
+        <div
+          aria-labelledby="all-courses-title"
+          aria-modal="true"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setIsCourseModalOpen(false)
+          }}
+          role="dialog"
+        >
+          <section className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-[2rem] bg-surface-container-lowest shadow-card">
+            <header className="flex items-center justify-between gap-4 border-b border-outline-variant px-5 py-4 sm:px-7">
+              <div>
+                <h2 className="font-headline text-xl font-extrabold text-on-background" id="all-courses-title">All courses</h2>
+                <p className="mt-1 font-body text-xs text-on-surface-variant">{courseItems.length} of {courses.length} courses</p>
+              </div>
+              <button aria-label="Close all courses" className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-surface-container text-on-surface hover:bg-surface-container-high" onClick={() => setIsCourseModalOpen(false)} type="button"><span className="material-symbols-outlined">close</span></button>
+            </header>
+
+            <div className="px-5 pt-5 sm:px-7">
+              <div className="relative">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-base text-on-surface-variant">search</span>
+                <input aria-label="Search all courses" autoFocus className={searchFieldClass} onChange={(event) => setCourseQuery(event.target.value)} placeholder="Search by course or department" type="search" value={courseQuery}/>
+              </div>
+            </div>
+
+            <div className="grid flex-1 gap-3 overflow-y-auto p-5 sm:grid-cols-2 sm:p-7">
+              {courseItems.length ? courseItems.map((course) => (
+                <button className="group flex items-center gap-3 rounded-2xl bg-surface-container-low p-4 text-left transition-colors hover:bg-surface-container" key={course.id} onClick={() => { setIsCourseModalOpen(false); navigate(`/learn/course/${course.slug}`) }} type="button">
+                  <CourseThumb course={course} size="sm" />
+                  <div className="min-w-0 flex-1"><p className="truncate font-headline text-sm font-bold text-on-background group-hover:text-primary">{course.title}</p><p className="truncate font-body text-xs text-on-surface-variant">{course.category} · {course.estimateTime || course.level}</p></div>
+                  <span className="material-symbols-outlined text-on-surface-variant">chevron_right</span>
+                </button>
+              )) : <div className="col-span-full flex flex-col items-center justify-center py-14 text-center"><span className="material-symbols-outlined text-5xl text-on-surface-variant/40">search_off</span><p className="mt-3 font-headline font-bold text-on-background">No courses found</p><p className="mt-1 font-body text-sm text-on-surface-variant">Try a different course or department name.</p></div>}
+            </div>
+
+            <footer className="flex justify-end border-t border-outline-variant px-5 py-4 sm:px-7"><button className="rounded-full bg-primary px-5 py-2.5 font-headline text-sm font-bold text-on-primary" onClick={() => { setIsCourseModalOpen(false); navigate('/learn') }} type="button">Open course catalogue</button></footer>
+          </section>
+        </div>
+      ) : null}
+
       <div className="rounded-[2rem] bg-surface-container-lowest p-5 sm:p-7 lg:p-9 shadow-soft">
         <header className="flex flex-col lg:flex-row lg:items-start justify-between gap-5">
           <div>
@@ -733,7 +791,7 @@ function DashboardPage() {
             </section>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <section className="rounded-3xl bg-surface-container-low p-5 flex flex-col min-h-[22rem]">
+              <section className="rounded-3xl bg-surface-container-low p-5 flex flex-col">
                 <div className="flex items-center gap-2 mb-4">
                   <h2 className="font-headline text-lg font-extrabold text-on-background">
                     Activity
@@ -810,12 +868,12 @@ function DashboardPage() {
                       Courses
                     </h2>
                     <span className="rounded-full bg-surface-container-high px-2.5 py-0.5 font-headline text-xs font-bold text-on-surface-variant">
-                      {courseItems.length}
+                      {courses.length}
                     </span>
                   </div>
                   <button
                     className="font-headline text-xs font-bold text-primary hover:opacity-80 transition-opacity"
-                    onClick={() => navigate('/learn')}
+                    onClick={() => setIsCourseModalOpen(true)}
                     type="button"
                   >
                     View all
@@ -836,9 +894,9 @@ function DashboardPage() {
                   />
                 </div>
 
-                <div className="flex-1 overflow-y-auto -mr-2 pr-2 space-y-2">
-                  {courseItems.length > 0 ? (
-                    courseItems.map((course) => (
+                <div className="space-y-2">
+                  {previewCourseItems.length > 0 ? (
+                    previewCourseItems.map((course) => (
                       <button
                         className="group w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left hover:bg-surface-container-lowest transition-colors"
                         key={course.id}
@@ -882,6 +940,7 @@ function DashboardPage() {
                     </div>
                   )}
                 </div>
+                {courseItems.length > COURSE_PREVIEW_LIMIT ? <button className="mt-3 self-center rounded-full px-4 py-2 font-headline text-xs font-bold text-primary hover:bg-surface-container-high" onClick={() => setIsCourseModalOpen(true)} type="button">Show {courseItems.length - COURSE_PREVIEW_LIMIT} more</button> : null}
               </section>
             </div>
           </div>

@@ -54,7 +54,7 @@ function getDockerConfig(room) {
 }
 
 function validateDockerConfig(config) {
-  if (!config.enabled) return 'Docker is not enabled for this room.'
+  if (!config.enabled) return 'Docker is not enabled for this skill.'
   if (!/^[a-zA-Z0-9][a-zA-Z0-9._/:@-]{0,511}$/.test(config.image)) {
     return 'Docker image is missing or contains unsupported characters.'
   }
@@ -650,7 +650,7 @@ function extractPartialEvaluationObject(raw) {
   const feedbackMatch = text.match(/"feedback"\s*:\s*"([\s\S]*)$/)
   const feedback = feedbackMatch
     ? feedbackMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\').replace(/"?\s*}?\s*$/, '').trim()
-    : 'Evaluation completed. Improve next: 1) Tie each answer directly to the room content. 2) Add exact examples where requested.'
+    : 'Evaluation completed. Improve next: 1) Tie each answer directly to the skill content. 2) Add exact examples where requested.'
 
   return {
     technicalScore,
@@ -668,42 +668,42 @@ function hashText(value) {
 
 function buildFallbackTheoreticalQuestions(room, userId, attemptSalt = '') {
   const seed = (Number(userId || 1) + hashText(attemptSalt)) % 5
-  const topic = room.title || room.category || 'this security concept'
+  const topic = room.title || room.category || 'this concept'
   const variants = [
     [
-      `Using only this room's content, explain the main idea behind "${topic}".`,
-      `From the room content, list two risks or impacts connected to "${topic}".`,
-      `Name one mitigation or careful practice mentioned or implied by this room for "${topic}".`,
-      `Describe one simple example or scenario for "${topic}" that stays within this room's content.`,
-      `What should a beginner remember most from this room about "${topic}"?`,
+      `Using only this skill's content, explain the main idea behind "${topic}".`,
+      `From the skill content, list two risks or impacts connected to "${topic}".`,
+      `Name one recommendation or careful practice mentioned or implied by this skill for "${topic}".`,
+      `Describe one simple example or scenario for "${topic}" that stays within this skill's content.`,
+      `What should a beginner remember most from this skill about "${topic}"?`,
     ],
     [
-      `Define "${topic}" at the same depth as this room explains it.`,
-      `What evidence or clues from the room content help you understand this issue?`,
-      `Summarize the room's remediation idea for "${topic}" in simple steps.`,
-      `Explain why "${topic}" matters for security based only on this room.`,
-      `List two room-specific terms or ideas that are important for understanding "${topic}".`,
+      `Define "${topic}" at the same depth as this skill explains it.`,
+      `What evidence or clues from the skill content help you understand this issue?`,
+      `Summarize the skill's recommended approach for "${topic}" in simple steps.`,
+      `Explain why "${topic}" matters based only on this skill.`,
+      `List two skill-specific terms or ideas that are important for understanding "${topic}".`,
     ],
     [
-      `What assumption or mistake does this room warn about in "${topic}"?`,
-      `Explain one prevention idea and one detection or verification idea that match this room.`,
-      `Write a short note explaining the likely impact described by this room.`,
+      `What assumption or mistake does this skill warn about in "${topic}"?`,
+      `Explain one prevention idea and one verification idea that match this skill.`,
+      `Write a short note explaining the likely impact described by this skill.`,
       `How would you explain the safe or correct approach for "${topic}" to a new learner?`,
-      `What part of the room content would you use as evidence for your answer about "${topic}"?`,
+      `What part of the skill content would you use as evidence for your answer about "${topic}"?`,
     ],
     [
-      `Explain "${topic}" to a beginner using only concepts covered in this room.`,
-      `Describe a basic triage process for "${topic}" based on this room's examples or explanation.`,
-      `What beginner mistake could happen with "${topic}", and how does the room suggest avoiding it?`,
-      `What is one consequence of ignoring the room's guidance about "${topic}"?`,
-      `Give one short checklist item that follows from this room's explanation of "${topic}".`,
+      `Explain "${topic}" to a beginner using only concepts covered in this skill.`,
+      `Describe a basic review process for "${topic}" based on this skill's examples or explanation.`,
+      `What beginner mistake could happen with "${topic}", and how does the skill suggest avoiding it?`,
+      `What is one consequence of ignoring the skill's guidance about "${topic}"?`,
+      `Give one short checklist item that follows from this skill's explanation of "${topic}".`,
     ],
     [
-      `Describe a simple threat scenario for "${topic}" without adding concepts outside this room.`,
-      `How would you verify that the issue in "${topic}" is understood or fixed, based on this room?`,
-      `Give one practical recommendation that follows directly from this room content.`,
-      `What is the difference between the unsafe and safer approach described or implied by this room?`,
-      `Summarize the room's key lesson about "${topic}" in two or three sentences.`,
+      `Describe a simple scenario for "${topic}" without adding concepts outside this skill.`,
+      `How would you verify that "${topic}" is understood or applied, based on this skill?`,
+      `Give one practical recommendation that follows directly from this skill content.`,
+      `What is the difference between the incorrect and recommended approach described or implied by this skill?`,
+      `Summarize the skill's key lesson about "${topic}" in two or three sentences.`,
     ],
   ]
 
@@ -721,12 +721,12 @@ function buildFallbackTheoreticalQuestions(room, userId, attemptSalt = '') {
 
   questions.push({
     id: `u${userId || 0}-bonus-interview`,
-    prompt: `Optional bonus: answer this as a beginner-friendly security interview question about "${topic}" using only this room's content.`,
+    prompt: `Optional bonus: answer this as a beginner-friendly interview question about "${topic}" using only this skill's content.`,
     rubric: 'Optional bonus. Award margin for clear, content-aligned explanation without requiring advanced details.',
     sourceType: 'interview',
-    company: 'General cybersecurity interview practice',
+    company: 'General interview practice',
     interview: `${topic} fundamentals screening`,
-    sourceInfo: 'Fallback bonus interview-style question based on this room content.',
+    sourceInfo: 'Fallback bonus interview-style question based on this skill content.',
     learnerVariant: `${room.id || topic}-${userId || 0}-${seed}-bonus`,
     contentAnchorVersion: 'content-anchored-v2',
     optional: true,
@@ -757,7 +757,7 @@ function ensureImprovementFeedback(feedback) {
     return text
   }
 
-  return `${text}\n\nImprove next: 1) Tie each answer directly to the room content. 2) Include the main security impact. 3) Add one concrete mitigation or validation step.`
+  return `${text}\n\nImprove next: 1) Tie each answer directly to the skill content. 2) Include the main impact. 3) Add one concrete recommendation or validation step.`
 }
 
 function tokenizeForAssessment(value) {
@@ -869,7 +869,7 @@ function evaluateTheoreticalAnswersLocally(room, questions, answers, reason = ''
     bonusScore,
     feedback: ensureImprovementFeedback(
       `${feedbackPrefix} ${allRequiredAttempted
-        ? 'Your answers were scored from answer completeness, room keyword alignment, and concrete security reasoning.'
+        ? 'Your answers were scored from answer completeness, skill keyword alignment, and concrete reasoning.'
         : 'Some required answers were missing or too short to evaluate fairly.'}`,
     ),
   }
@@ -897,7 +897,7 @@ async function generateTheoreticalQuestions(room, userId, attemptSalt = '') {
         {
           role: 'system',
           content:
-            'Generate assessment questions for a cybersecurity learning room. Return strict JSON only: {"questions":[{"id":"string","prompt":"string","rubric":"string","sourceType":"generated|interview","company":"string","interview":"string","sourceInfo":"string","learnerVariant":"string","contentAnchorVersion":"content-anchored-v2","optional":false,"bonus":false}]}. Create exactly 5 required open-ended theoretical questions plus exactly 1 optional bonus interview question. HARD RULE: every question must be answerable using only the supplied room content. Do not ask about tools, algorithms, exploitation details, historical examples, companies, interview trivia, or advanced concepts unless they are explicitly present in the room content. Match the selected room difficulty exactly; for Easy/basic rooms, ask concept, purpose, impact, and simple mitigation questions only. Avoid expert-level wording. The 5 required questions must use sourceType "generated", optional false, bonus false. The 1 optional bonus question must use sourceType "interview", optional true, bonus true, and must still be content-aligned. For the bonus question, include company and interview context if this resembles a known public company interview pattern; otherwise use company "General cybersecurity interview practice" and explain that it is interview-style practice in sourceInfo. Do not include answers.',
+            'Generate assessment questions for a learning skill. Return strict JSON only: {"questions":[{"id":"string","prompt":"string","rubric":"string","sourceType":"generated|interview","company":"string","interview":"string","sourceInfo":"string","learnerVariant":"string","contentAnchorVersion":"content-anchored-v2","optional":false,"bonus":false}]}. Create exactly 5 required open-ended theoretical questions plus exactly 1 optional bonus interview question. HARD RULE: every question must be answerable using only the supplied skill content. Do not ask about tools, algorithms, technical details, historical examples, companies, interview trivia, or advanced concepts unless they are explicitly present in the skill content. Match the selected skill difficulty exactly; for Easy/basic skills, ask concept, purpose, impact, and simple application questions only. Avoid expert-level wording. The 5 required questions must use sourceType "generated", optional false, bonus false. The 1 optional bonus question must use sourceType "interview", optional true, bonus true, and must still be content-aligned. For the bonus question, include company and interview context if this resembles a known public company interview pattern; otherwise use company "General interview practice" and explain that it is interview-style practice in sourceInfo. Do not include answers.',
         },
         {
           role: 'user',
@@ -905,12 +905,12 @@ async function generateTheoreticalQuestions(room, userId, attemptSalt = '') {
             learnerSeed: userId,
             learnerVariant: `${room.id || room.slug}-${userId}-${attemptSalt || Date.now().toString(36)}`,
             uniquenessInstruction:
-              'Use the learnerSeed and learnerVariant to vary wording only. Do not vary the technical scope beyond the supplied room content.',
+              'Use the learnerSeed and learnerVariant to vary wording only. Do not vary the scope beyond the supplied skill content.',
             title: room.title,
             category: room.category,
             difficulty: room.difficulty || room.level,
             strictScope:
-              'Use only this room content as the syllabus. If a detail is not in the content, do not ask about it. Prefer direct comprehension and application over advanced extension.',
+              'Use only this skill content as the syllabus. If a detail is not in the content, do not ask about it. Prefer direct comprehension and application over advanced extension.',
             content: buildQuestionContentContext(room),
           }),
         },
@@ -1002,8 +1002,8 @@ async function evaluateTheoreticalAnswers(room, questions, answers) {
       bonusScore,
       feedback:
         technicalScore === 100
-          ? 'Fallback evaluator accepted all responses as sufficiently detailed. Improve next: keep tying each answer to the room terms and examples.'
-          : 'Add more complete, technically specific answers for every question. Improve next: mention the room concept, impact, and at least one mitigation in each answer.',
+          ? 'Fallback evaluator accepted all responses as sufficiently detailed. Improve next: keep tying each answer to the skill terms and examples.'
+          : 'Add more complete, specific answers for every question. Improve next: mention the skill concept, impact, and at least one recommendation in each answer.',
     }
   }
 
@@ -1024,7 +1024,7 @@ async function evaluateTheoreticalAnswers(room, questions, answers) {
         {
           role: 'system',
           content:
-            'Evaluate cybersecurity assessment answers. Return strict JSON only: {"technicalScore":0-100,"grammarScore":0-100,"bonusScore":0-10,"feedback":"string"}. Grade required questions only against the supplied room content and question rubrics. Optional bonus interview questions must not reduce the score if blank or wrong; they may add 0-10 bonus margin only when answered and content-aligned. Be generous for beginners: if an answer captures the main room idea, impact, and a reasonable mitigation or example, treat it as correct even if wording is simple or not textbook-perfect. Do not penalize learners for omitting advanced material that is not in the room content. Award 90+ when all required answers are mostly correct and content-aligned; reserve low scores for missing, unrelated, or clearly wrong answers. Technical score should be the required-question score before bonus. Grammar score evaluates clarity and professional writing but should not punish minor grammar mistakes. Feedback must mention bonus credit if an optional interview question was answered, and must end with a concise "Improve next:" section listing exactly 2-4 specific improvements.',
+            'Evaluate assessment answers. Return strict JSON only: {"technicalScore":0-100,"grammarScore":0-100,"bonusScore":0-10,"feedback":"string"}. Grade required questions only against the supplied skill content and question rubrics. Optional bonus interview questions must not reduce the score if blank or wrong; they may add 0-10 bonus margin only when answered and content-aligned. Be generous for beginners: if an answer captures the main skill idea, impact, and a reasonable application or example, treat it as correct even if wording is simple or not textbook-perfect. Do not penalize learners for omitting advanced material that is not in the skill content. Award 90+ when all required answers are mostly correct and content-aligned; reserve low scores for missing, unrelated, or clearly wrong answers. Technical score should be the required-question score before bonus. Grammar score evaluates clarity and professional writing but should not punish minor grammar mistakes. Feedback must mention bonus credit if an optional interview question was answered, and must end with a concise "Improve next:" section listing exactly 2-4 specific improvements.',
         },
         {
           role: 'user',
@@ -1099,12 +1099,12 @@ function buildFallbackProfileAnalysis(completedRooms) {
     suitableRole: roleMap[topCategory] || `${topCategory} Security Analyst`,
     confidence: completedRooms.length >= 5 ? 'High' : completedRooms.length >= 2 ? 'Medium' : 'Early signal',
     summary: completedRooms.length
-      ? `Your completed rooms show the strongest signal in ${topCategory}. Continue completing varied rooms to improve the recommendation quality.`
-      : 'Complete rooms and theoretical evaluations to unlock a more accurate role recommendation.',
+      ? `Your completed skills show the strongest signal in ${topCategory}. Continue completing varied skills to improve the recommendation quality.`
+      : 'Complete skills and theoretical evaluations to unlock a more accurate role recommendation.',
     strengths: strengths.slice(0, 3).length ? strengths.slice(0, 3) : [`Consistent progress in ${topCategory}`],
     improvementAreas: improvements.slice(0, 3).length
       ? improvements.slice(0, 3)
-      : ['Complete more theoretical rooms with detailed, specific answers.'],
+      : ['Complete more theoretical skills with detailed, specific answers.'],
   }
 }
 
@@ -1130,7 +1130,7 @@ async function generateProfileAnalysis(completedRooms) {
         {
           role: 'system',
           content:
-            'Analyze a cybersecurity learner profile. Return strict JSON only: {"suitableRole":"string","confidence":"High|Medium|Early signal","summary":"string","strengths":["string"],"improvementAreas":["string"]}. Base the recommendation only on completed rooms, theoretical answers, scores, and feedback.',
+            'Analyze a learner profile. Return strict JSON only: {"suitableRole":"string","confidence":"High|Medium|Early signal","summary":"string","strengths":["string"],"improvementAreas":["string"]}. Base the recommendation only on completed skills, theoretical answers, scores, and feedback.',
         },
         {
           role: 'user',
@@ -1320,7 +1320,7 @@ function parseCustomInterviewQuestions(room) {
     .map((question, index) => ({
       id: String(question?.id || `custom-interview-${index + 1}`).trim(),
       prompt: String(question?.prompt || '').trim(),
-      rubric: String(question?.rubric || question?.hint || 'Optional interview bonus. Award margin for clear, room-aligned reasoning.').trim(),
+      rubric: String(question?.rubric || question?.hint || 'Optional interview bonus. Award margin for clear, skill-aligned reasoning.').trim(),
       sourceType: 'interview',
       company: String(question?.company || 'General cybersecurity interview practice').trim(),
       interview: String(question?.interview || 'Custom admin interview question').trim(),
@@ -1469,7 +1469,7 @@ async function matchInterviewQuestionsToRooms(questions, rooms) {
         {
           role: 'system',
           content:
-            'Match custom cybersecurity interview questions to the single best room. Return strict JSON only: {"matches":[{"questionIndex":0,"roomId":"string","reason":"short reason","company":"string","interview":"string","sourceInfo":"string","rubric":"string"}]}. Pick only from provided room ids. Prefer exact content/topic alignment. If company/interview is not provided, use "General cybersecurity interview practice".',
+            'Match custom interview questions to the single best skill. Return strict JSON only: {"matches":[{"questionIndex":0,"roomId":"string","reason":"short reason","company":"string","interview":"string","sourceInfo":"string","rubric":"string"}]}. Pick only from the provided skill identifiers. Prefer exact content/topic alignment. If company/interview is not provided, use "General interview practice".',
         },
         {
           role: 'user',
@@ -1497,11 +1497,11 @@ async function matchInterviewQuestionsToRooms(questions, rooms) {
         ? {
           question,
           roomId: String(match.roomId),
-          reason: String(match.reason || 'AI matched this question to the closest room content.'),
+          reason: String(match.reason || 'AI matched this question to the closest skill content.'),
           company: String(match.company || 'General cybersecurity interview practice'),
           interview: String(match.interview || 'Custom admin interview question'),
           sourceInfo: String(match.sourceInfo || match.reason || 'Custom interview question matched by Admin AI.'),
-          rubric: String(match.rubric || 'Optional interview bonus. Award margin for clear, room-aligned reasoning.'),
+          rubric: String(match.rubric || 'Optional interview bonus. Award margin for clear, skill-aligned reasoning.'),
           matchedBy: 'ai',
         }
         : null
@@ -1519,11 +1519,11 @@ async function matchInterviewQuestionsToRooms(questions, rooms) {
     return {
       question,
       roomId: bestRoom?.id || rooms[0].id,
-      reason: 'Matched locally by overlapping room title, category, and content keywords.',
+      reason: 'Matched locally by overlapping skill title, category, and content keywords.',
       company: 'General cybersecurity interview practice',
       interview: 'Custom admin interview question',
       sourceInfo: 'Custom interview question matched locally because AI matching was unavailable.',
-      rubric: 'Optional interview bonus. Award margin for clear, room-aligned reasoning.',
+      rubric: 'Optional interview bonus. Award margin for clear, skill-aligned reasoning.',
       matchedBy: 'local',
     }
   })
@@ -1541,7 +1541,7 @@ router.post('/admin/interview-questions', authenticate, requireAdmin, async (req
 
   const roomsForMatching = await fetchRoomsForInterviewMatching()
   if (!roomsForMatching.length) {
-    return res.status(400).json({ message: 'No rooms are available for matching.' })
+    return res.status(400).json({ message: 'No skills are available for matching.' })
   }
 
   const matches = await matchInterviewQuestionsToRooms(questions, roomsForMatching)
@@ -1768,7 +1768,7 @@ router.get('/profile/analysis', authenticate, async (req, res) => {
 router.put('/:id/progress', authenticate, async (req, res) => {
   const room = await fetchRoomById(req.params.id)
   if (!room) {
-    return res.status(404).json({ message: 'Room not found' })
+    return res.status(404).json({ message: 'Skill not found' })
   }
 
   const status = req.body?.status
@@ -1813,7 +1813,7 @@ router.put('/:id/progress', authenticate, async (req, res) => {
 
       if (!attemptRows[0]?.passed) {
         return res.status(400).json({
-          message: 'Score 100 in the theoretical technical evaluation before marking this room complete.',
+          message: 'Score 100 in the theoretical technical evaluation before marking this skill complete.',
         })
       }
     } else {
@@ -1831,7 +1831,7 @@ router.put('/:id/progress', authenticate, async (req, res) => {
 
         if (!allCompleted) {
           return res.status(400).json({
-            message: 'Complete all configured questions correctly before marking this room complete.',
+            message: 'Complete all configured questions correctly before marking this skill complete.',
           })
         }
       }
@@ -1847,7 +1847,7 @@ router.put('/:id/progress', authenticate, async (req, res) => {
 
         if (!attemptRows[0]?.passed) {
           return res.status(400).json({
-            message: 'Score 100 in the practical AI evaluation before marking this room complete.',
+            message: 'Score 100 in the practical AI evaluation before marking this skill complete.',
           })
         }
       }
@@ -1891,7 +1891,7 @@ router.put('/:id/progress', authenticate, async (req, res) => {
 router.get('/:id/questions/status', authenticate, async (req, res) => {
   const room = await fetchRoomById(req.params.id)
   if (!room) {
-    return res.status(404).json({ message: 'Room not found' })
+    return res.status(404).json({ message: 'Skill not found' })
   }
 
   if (isTheoreticalRoom(room)) {
@@ -2000,7 +2000,7 @@ router.get('/:id/questions/status', authenticate, async (req, res) => {
 router.post('/:id/questions/submit', authenticate, async (req, res) => {
   const room = await fetchRoomById(req.params.id)
   if (!room) {
-    return res.status(404).json({ message: 'Room not found' })
+    return res.status(404).json({ message: 'Skill not found' })
   }
 
   if (isTheoreticalRoom(room)) {
@@ -2087,7 +2087,7 @@ router.post('/:id/questions/submit', authenticate, async (req, res) => {
   const manualQuestions = room?.content?.questionsEnabled ? parseRoomQuestions(room) : []
   const aiEnabled = hasPracticalAiQuestions(room)
   if (manualQuestions.length === 0 && !aiEnabled) {
-    return res.status(400).json({ message: 'Question mode is disabled for this room.' })
+    return res.status(400).json({ message: 'Question mode is disabled for this skill.' })
   }
 
   const answers = req.body?.answers && typeof req.body.answers === 'object' ? req.body.answers : {}
@@ -2555,7 +2555,7 @@ router.use('/:id/docker/proxy', async (req, res) => {
 
   const room = await fetchRoomById(req.params.id)
   if (!room) {
-    return res.status(404).send('Room not found.')
+    return res.status(404).send('Skill not found.')
   }
 
   const config = getDockerConfig(room)
@@ -2577,7 +2577,7 @@ router.use('/:id/docker/proxy', async (req, res) => {
   )
   const instance = rows[0]
   if (!instance) {
-    return res.status(404).send('No active Docker challenge is running for this room.')
+    return res.status(404).send('No active Docker challenge is running for this skill.')
   }
 
   const expired = await stopStaleDockerInstance(instance, config)
@@ -2760,7 +2760,7 @@ router.get('/docker-machines/me', authenticate, async (req, res) => {
 router.get('/:id/docker/status', authenticate, async (req, res) => {
   const room = await fetchRoomById(req.params.id)
   if (!room) {
-    return res.status(404).json({ message: 'Room not found' })
+    return res.status(404).json({ message: 'Skill not found' })
   }
 
   const config = getDockerConfig(room)
@@ -2838,7 +2838,7 @@ router.get('/:id/docker/status', authenticate, async (req, res) => {
 router.post('/:id/docker/spawn', authenticate, async (req, res) => {
   const room = await fetchRoomById(req.params.id)
   if (!room) {
-    return res.status(404).json({ message: 'Room not found' })
+    return res.status(404).json({ message: 'Skill not found' })
   }
 
   const config = getDockerConfig(room)
@@ -2938,7 +2938,7 @@ router.post('/:id/docker/spawn', authenticate, async (req, res) => {
     containerId = createdContainer.containerId
   } catch (error) {
     return res.status(500).json({
-      message: error?.message || 'Unable to start Docker container for this practical room.',
+      message: error?.message || 'Unable to start Docker container for this practical skill.',
     })
   }
   const inspected = await inspectDockerContainer(containerId)
@@ -3012,7 +3012,7 @@ router.post('/:id/docker/spawn', authenticate, async (req, res) => {
 router.post('/:id/docker/stop', authenticate, async (req, res) => {
   const room = await fetchRoomById(req.params.id)
   if (!room) {
-    return res.status(404).json({ message: 'Room not found' })
+    return res.status(404).json({ message: 'Skill not found' })
   }
 
   const containerName = buildDockerContainerName(req.user.id, room.id)
@@ -3032,7 +3032,7 @@ router.post('/:id/docker/stop', authenticate, async (req, res) => {
 router.post('/:id/docker/terminal', authenticate, async (req, res) => {
   const room = await fetchRoomById(req.params.id)
   if (!room) {
-    return res.status(404).json({ message: 'Room not found' })
+    return res.status(404).json({ message: 'Skill not found' })
   }
 
   const config = getDockerConfig(room)
@@ -3147,7 +3147,7 @@ router.post('/:id/docker/terminal', authenticate, async (req, res) => {
 router.get('/:id', optionalAuthenticate, async (req, res) => {
   const room = await fetchRoomById(req.params.id)
   if (!room) {
-    return res.status(404).json({ message: 'Room not found' })
+    return res.status(404).json({ message: 'Skill not found' })
   }
   return res.json(roomResponseForRequest(room, req))
 })
@@ -3245,7 +3245,7 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
 router.put('/:id', authenticate, requireAdmin, async (req, res) => {
   const existing = await fetchRoomById(req.params.id)
   if (!existing) {
-    return res.status(404).json({ message: 'Room not found' })
+    return res.status(404).json({ message: 'Skill not found' })
   }
 
   const payload = req.body || {}
@@ -3348,7 +3348,7 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
 router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
   const existing = await fetchRoomById(req.params.id)
   if (!existing) {
-    return res.status(404).json({ message: 'Room not found' })
+    return res.status(404).json({ message: 'Skill not found' })
   }
 
   await pool.query('DELETE FROM rooms WHERE id = ?', [existing.id])
@@ -3392,7 +3392,7 @@ export function setupRoomTerminalWebSocket(server) {
       const user = jwt.verify(token, env.jwtSecret)
       const room = await fetchRoomById(roomId)
       if (!room) {
-        sendJson({ type: 'error', message: 'Room not found.' })
+        sendJson({ type: 'error', message: 'Skill not found.' })
         ws.close()
         return
       }

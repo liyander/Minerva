@@ -454,7 +454,7 @@ function DeveloperDashboardPage() {
                             <p className="text-xs text-on-surface-variant">{user.registrationNumber || user.email || user.role}</p>
                           </td>
                           <td className="py-4 pr-4 text-on-surface-variant">
-                            {user.currentRoom?.title || 'No active room'}
+                            {user.currentRoom?.title || 'No active skill'}
                           </td>
                           <td className="py-4 pr-4 text-on-surface-variant">
                             {user.docker?.containerName || user.docker?.status || 'None'}

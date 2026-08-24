@@ -792,10 +792,10 @@ function AdminCareerPathEditorPage() {
                         </div>
                       )}
 
-                      {/* Room Assignment */}
+                      {/* Skill Assignment */}
                       <div className="mt-6 pt-6 border-t border-outline-variant/20">
                         <p className="text-xs font-bold text-on-surface-variant mb-3">
-                          Assigned Rooms
+                          Assigned Skills
                         </p>
                         <div className="space-y-2 mb-4">
                           {module.rooms && module.rooms.length > 0 ? (
@@ -867,8 +867,8 @@ function AdminCareerPathEditorPage() {
                               >
                                 <option value="">
                                   {availableRooms.length
-                                    ? `+ Add Room to Module (${availableRooms.length} match${availableRooms.length === 1 ? '' : 'es'})`
-                                    : 'No matching rooms available'}
+                                    ? `+ Add Skill to Module (${availableRooms.length} match${availableRooms.length === 1 ? '' : 'es'})`
+                                    : 'No matching skills available'}
                                 </option>
                                 {availableRooms.map((room) => (
                                   <option key={room.id} value={room.id}>

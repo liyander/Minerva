@@ -90,7 +90,7 @@ export default function PrivateSuggestionModal({ student, rooms = [], isOpen, on
           <form onSubmit={handleSend} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-on-surface-variant mb-1">
-                Associated Course (Optional)
+                Associated Skill (Optional)
               </label>
               <select
                 value={selectedRoomId}

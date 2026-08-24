@@ -97,7 +97,7 @@ function AdminTopStudentResumesPage() {
             Top 10 Player Resumes
           </h1>
           <p className="text-sm text-on-surface-variant mt-4 max-w-2xl">
-            Download resumes uploaded by the current scoreboard top 10. Eligibility is recalculated from live XP, completed rooms, and technical score ordering.
+            Download resumes uploaded by the current scoreboard top 10. Eligibility is recalculated from live XP, completed skills, and technical score ordering.
           </p>
         </header>
 
@@ -160,7 +160,7 @@ function AdminTopStudentResumesPage() {
                       <td className="px-5 py-5">
                         <p className="font-headline text-lg font-bold text-primary">{player.xp} XP</p>
                         <p className="text-xs text-on-surface-variant">
-                          {player.completedRooms} rooms · {player.averageTechnicalScore}% technical
+                          {player.completedRooms} skills · {player.averageTechnicalScore}% technical
                         </p>
                       </td>
                       <td className="px-5 py-5">

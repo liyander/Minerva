@@ -76,7 +76,7 @@ const ACHIEVEMENT_DEFINITIONS = [
     name: 'First Step',
     icon: 'flag',
     tone: 'primary',
-    criteria: 'Complete 1 room',
+    criteria: 'Complete 1 skill',
     isUnlocked: ({ completedRooms }) => completedRooms >= 1,
   },
   {
@@ -84,7 +84,7 @@ const ACHIEVEMENT_DEFINITIONS = [
     name: 'Getting Consistent',
     icon: 'timeline',
     tone: 'secondary',
-    criteria: 'Complete 3 rooms',
+    criteria: 'Complete 3 skills',
     isUnlocked: ({ completedRooms }) => completedRooms >= 3,
   },
   {
@@ -92,7 +92,7 @@ const ACHIEVEMENT_DEFINITIONS = [
     name: 'Hands On',
     icon: 'terminal',
     tone: 'primary',
-    criteria: 'Complete 5 rooms',
+    criteria: 'Complete 5 skills',
     isUnlocked: ({ completedRooms }) => completedRooms >= 5,
   },
   {
@@ -100,7 +100,7 @@ const ACHIEVEMENT_DEFINITIONS = [
     name: 'On a Roll',
     icon: 'conversion_path',
     tone: 'secondary',
-    criteria: 'Complete 7 rooms',
+    criteria: 'Complete 7 skills',
     isUnlocked: ({ completedRooms }) => completedRooms >= 7,
   },
   {
@@ -132,7 +132,7 @@ const ACHIEVEMENT_DEFINITIONS = [
     name: 'Well Rounded',
     icon: 'hub',
     tone: 'secondary',
-    criteria: 'Complete rooms in 3 categories',
+    criteria: 'Complete skills in 3 categories',
     isUnlocked: ({ categories }) => categories >= 3,
   },
   {
@@ -140,7 +140,7 @@ const ACHIEVEMENT_DEFINITIONS = [
     name: 'Broad Horizons',
     icon: 'travel_explore',
     tone: 'secondary',
-    criteria: 'Complete rooms in 5 categories',
+    criteria: 'Complete skills in 5 categories',
     isUnlocked: ({ categories }) => categories >= 5,
   },
   {
@@ -172,7 +172,7 @@ const ACHIEVEMENT_DEFINITIONS = [
     name: 'Fresh Start',
     icon: 'bolt',
     tone: 'primary',
-    criteria: 'Complete a room in the last 7 days',
+    criteria: 'Complete a skill in the last 7 days',
     isUnlocked: ({ recentCompletions }) => recentCompletions >= 1,
   },
   {
@@ -180,7 +180,7 @@ const ACHIEVEMENT_DEFINITIONS = [
     name: 'Rapid Triage',
     icon: 'speed',
     tone: 'secondary',
-    criteria: 'Complete 3 rooms in the last 7 days',
+    criteria: 'Complete 3 skills in the last 7 days',
     isUnlocked: ({ recentCompletions }) => recentCompletions >= 3,
   },
   {
@@ -188,7 +188,7 @@ const ACHIEVEMENT_DEFINITIONS = [
     name: 'Deep Focus',
     icon: 'workspace_premium',
     tone: 'secondary',
-    criteria: 'Complete 10 rooms or earn 5,000 XP',
+    criteria: 'Complete 10 skills or earn 5,000 XP',
     isUnlocked: ({ completedRooms, xp }) => completedRooms >= 10 || xp >= 5000,
   },
 ]
@@ -496,7 +496,7 @@ function ProfilePage() {
           id: roomId,
           title: room?.title || roomId,
           category: room?.category || room?.categoryTag || 'Lab',
-          difficulty: room?.difficulty || room?.level || 'Room',
+          difficulty: room?.difficulty || room?.level || 'Skill',
           xp: parseXpValue(room?.xp),
           completedAt: progress.completedAt,
         }
@@ -531,7 +531,7 @@ function ProfilePage() {
   const networkState = profileStats.completedRooms === 0
     ? {
         label: 'Waiting…',
-        message: 'Complete your first room to activate performance telemetry.',
+        message: 'Complete your first skill to activate performance insights.',
         action: 'Start your first course',
       }
     : percentile
@@ -542,7 +542,7 @@ function ProfilePage() {
         }
       : {
           label: 'Local',
-          message: `You have completed ${profileStats.completedRooms} room${profileStats.completedRooms === 1 ? '' : 's'} and earned ${formatNumber(profileStats.xp)} XP.`,
+          message: `You have completed ${profileStats.completedRooms} skill${profileStats.completedRooms === 1 ? '' : 's'} and earned ${formatNumber(profileStats.xp)} XP.`,
           action: 'Sync rankings',
         }
 
@@ -571,7 +571,7 @@ function ProfilePage() {
                   {formatNumber(profileStats.xp)}
                 </span>
                 <span className="font-headline text-xs text-primary/60 mt-1">
-                  {profileStats.completedRooms} rooms completed
+                  {profileStats.completedRooms} skills completed
                 </span>
               </div>
             </div>
@@ -586,12 +586,12 @@ function ProfilePage() {
                   </span>
                   <h2 className="font-headline font-bold text-2xl tracking-tight mt-2">
                     {isLoadingAnalysis
-                      ? 'Analyzing completed rooms...'
-                      : aiAnalysis?.suitableRole || 'Complete rooms to unlock role analysis'}
+                      ? 'Analyzing completed skills...'
+                      : aiAnalysis?.suitableRole || 'Complete skills to unlock role analysis'}
                   </h2>
                   <p className="text-sm text-on-surface-variant leading-relaxed mt-3">
                     {aiAnalysis?.summary ||
-                      'The recommendation is generated from completed rooms, theoretical scores, answered questions, and evaluator feedback.'}
+                      'The recommendation is generated from completed skills, theoretical scores, answered questions, and evaluator feedback.'}
                   </p>
                 </div>
                 <div className="rounded-2xl bg-surface-container-high px-5 py-4 min-w-44">
@@ -602,7 +602,7 @@ function ProfilePage() {
                     {aiAnalysis?.confidence || 'Pending'}
                   </p>
                   <p className="text-xs text-on-surface-variant mt-2">
-                    {Number(aiAnalysis?.completedRooms || 0)} rooms completed
+                    {Number(aiAnalysis?.completedRooms || 0)} skills completed
                   </p>
                 </div>
               </div>
@@ -613,7 +613,7 @@ function ProfilePage() {
                     Strengths
                   </h3>
                   <div className="space-y-3">
-                    {(aiAnalysis?.strengths || ['Complete more rooms to identify your strongest skills.']).map((item) => (
+                    {(aiAnalysis?.strengths || ['Complete more skills to identify your strongest capabilities.']).map((item) => (
                       <p className="text-sm text-on-surface-variant leading-relaxed" key={item}>
                         {item}
                       </p>
@@ -705,7 +705,7 @@ function ProfilePage() {
                 <div>
                   <h2 className="font-headline font-bold text-sm">Lab Completion Timeline</h2>
                   <p className="mt-1 text-xs font-headline text-on-surface-variant">
-                    Latest completed rooms
+                    Latest completed skills
                   </p>
                 </div>
                 <span className="rounded-lg inline-flex items-center gap-1 bg-secondary/15 px-2.5 py-1 text-xs font-headline font-bold text-secondary">
@@ -753,7 +753,7 @@ function ProfilePage() {
                       No completed labs yet
                     </p>
                     <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
-                      Complete a room to start building your operator timeline.
+                      Complete a skill to start building your learning timeline.
                     </p>
                   </div>
                 )}
@@ -765,7 +765,7 @@ function ProfilePage() {
                 <div>
                   <h2 className="font-headline font-bold text-xl tracking-tight">Achievement Vault</h2>
                   <p className="text-on-surface-variant text-xs font-headline mt-1">
-                    Criteria based on XP, completed rooms, categories, and module mastery
+                    Criteria based on XP, completed skills, categories, and module mastery
                   </p>
                 </div>
                 <span className="font-headline text-xs text-primary border-b-2 border-primary pb-1">

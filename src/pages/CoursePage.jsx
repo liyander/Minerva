@@ -646,7 +646,7 @@ function CoursePage() {
     return (
       <main className="pt-16 md:pt-20 min-h-screen flex items-center justify-center">
         <p className="text-on-surface-variant font-headline text-xs">
-          Loading room content...
+          Loading skill content...
         </p>
       </main>
     )
@@ -669,13 +669,13 @@ function CoursePage() {
     'Apply secure coding practices, validate all user input, and enforce least privilege access.'
   const vulnerabilityDefinition =
     room.content?.vulnerabilityBriefing?.definition ||
-    'No vulnerability definition has been configured for this room yet.'
+    'No foundation definition has been configured for this skill yet.'
   const vulnerabilityImpact =
     room.content?.vulnerabilityBriefing?.impact ||
-    'No impact summary has been configured for this room yet.'
+    'No impact summary has been configured for this skill yet.'
   const technicalDeepDive =
     room.content?.technicalDeepDive ||
-    'No technical deep dive has been configured for this room yet.'
+    'No technical deep dive has been configured for this skill yet.'
 
   const roomTags = room.tags?.length ? room.tags : [room.categoryTag || room.category].filter(Boolean)
   const keywordTags = room.requiredKeywords?.length ? room.requiredKeywords : []
@@ -718,7 +718,7 @@ function CoursePage() {
     setCompletionError('')
 
     if (isPreparingTheoreticalQuestions) {
-      setCompletionError('AI is preparing your theoretical questions. Complete the assessment before marking this room complete.')
+      setCompletionError('AI is preparing your theoretical questions. Complete the assessment before marking this skill complete.')
       return
     }
 
@@ -726,7 +726,7 @@ function CoursePage() {
       setCompletionError(
         isAiQuestionMode
           ? 'Score 100 in the technical evaluation before marking complete.'
-          : 'Answer all room questions correctly before marking complete.',
+          : 'Answer all skill questions correctly before marking complete.',
       )
       return
     }
@@ -894,10 +894,10 @@ function CoursePage() {
         }
         setQuestionFeedback(
           resultMode === 'theoretical'
-            ? 'Technical score is 100. This room has been completed.'
+            ? 'Technical score is 100. This skill has been completed.'
             : resultMode === 'hybrid'
-              ? 'Manual and AI checks passed. You can now complete this room.'
-            : 'All answers are correct. You can now complete this room.',
+              ? 'Manual and AI checks passed. You can now complete this skill.'
+            : 'All answers are correct. You can now complete this skill.',
         )
       } else {
         setQuestionFeedback(
@@ -938,7 +938,7 @@ function CoursePage() {
                 <div className="h-full w-2/3 bg-primary animate-pulse"></div>
               </div>
               <p className="mt-4 font-headline text-xs text-on-surface-variant">
-                Please keep this room open
+                Please keep this skill open
               </p>
             </div>
           </div>
@@ -1012,7 +1012,7 @@ function CoursePage() {
               <p className="text-sm text-on-surface-variant leading-relaxed mb-6 whitespace-pre-wrap break-words">
                 {resultModal.feedback ||
                   (resultModal.passed
-                    ? 'You met the completion requirement for this room.'
+                    ? 'You met the completion requirement for this skill.'
                     : resultModal.mode === 'theoretical' || resultModal.mode === 'hybrid'
                       ? 'Improve the technical accuracy of your answers and submit again.'
                       : 'Review the incorrect answers and submit again.')}
@@ -1029,38 +1029,57 @@ function CoursePage() {
           </div>
         </div>
       ) : null}
-      <div ref={contentRootRef} className="max-w-[96rem] mx-auto p-8 lg:p-12">
-        <header className="mb-12 shadow-soft pl-8">
-          <div className="flex flex-wrap gap-2 mb-4">
-            {roomTags.map((tag) => (
-              <span
-                key={tag}
-                className="rounded-lg bg-primary-container text-on-primary-container px-3 py-1 font-headline text-sm font-bold"
-              >
-                {tag}
+      <div ref={contentRootRef} className="mx-auto max-w-[92rem] px-4 pb-28 pt-7 sm:px-6 lg:px-8 lg:pt-10">
+        <header className="relative mb-8 overflow-hidden rounded-[2rem] border border-outline-variant/30 bg-gradient-to-br from-primary/10 via-surface-container-lowest to-secondary/10 px-6 py-8 shadow-soft sm:px-8 lg:px-10 lg:py-10">
+          <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-primary/10 blur-3xl"></div>
+          <div className="pointer-events-none absolute -bottom-24 right-40 h-56 w-56 rounded-full bg-secondary/10 blur-3xl"></div>
+          <div className="relative max-w-5xl">
+            <div className="mb-5 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 font-headline text-[11px] font-bold uppercase tracking-wider text-on-primary">
+                <span className="material-symbols-outlined text-sm">school</span>
+                Learning skill
               </span>
-            ))}
-          </div>
-          <h1 className="text-5xl lg:text-6xl font-extrabold tracking-tighter mb-4 text-on-background font-headline">
-            {room.title}
-          </h1>
-          <p className="text-on-surface-variant max-w-2xl text-lg font-body leading-relaxed">
-            {room.description}
-          </p>
-          {room.trainerName ? (
-            <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-secondary-container px-4 py-2 text-on-secondary-container">
-              <span className="material-symbols-outlined text-base">co_present</span>
-              <span className="font-headline text-sm font-bold">Trainer: {room.trainerName}</span>
+              {roomTags.map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full border border-primary/15 bg-surface-container-lowest/80 px-3 py-1.5 font-headline text-xs font-bold text-on-surface backdrop-blur-sm"
+                >
+                  {tag}
+                </span>
+              ))}
             </div>
-          ) : null}
+            <h1 className="max-w-5xl font-headline text-4xl font-extrabold tracking-[-0.045em] text-on-background sm:text-5xl lg:text-6xl">
+              {room.title}
+            </h1>
+            <p className="mt-5 max-w-3xl font-body text-base leading-7 text-on-surface-variant sm:text-lg">
+              {room.description}
+            </p>
+            <div className="mt-6 flex flex-wrap items-center gap-3 text-xs font-headline font-bold text-on-surface-variant">
+              <span className="inline-flex items-center gap-2 rounded-full bg-surface-container-lowest/80 px-4 py-2 backdrop-blur-sm">
+                <span className="material-symbols-outlined text-base text-primary">schedule</span>
+                {room.estimateTime || 'Self paced'}
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full bg-surface-container-lowest/80 px-4 py-2 backdrop-blur-sm">
+                <span className="material-symbols-outlined text-base text-secondary">signal_cellular_alt</span>
+                {room.difficulty || room.level || 'All levels'}
+              </span>
+              {room.trainerName ? (
+                <span className="inline-flex items-center gap-2 rounded-full bg-surface-container-lowest/80 px-4 py-2 backdrop-blur-sm">
+                  <span className="material-symbols-outlined text-base text-primary">co_present</span>
+                  {room.trainerName}
+                </span>
+              ) : null}
+            </div>
+          </div>
         </header>
 
-        <div className={`grid grid-cols-1 ${isTerminalSplitLayout ? 'xl:grid-cols-[minmax(0,1fr)_minmax(34rem,0.9fr)] gap-8 items-start' : 'lg:grid-cols-12 gap-12'}`}>
-          <div className={`${isTerminalSplitLayout ? 'min-w-0 space-y-12' : 'lg:col-span-8 space-y-12'}`}>
-            <section className="rounded-2xl bg-surface-container-lowest p-8 relative overflow-hidden">
-              <div className="rounded-xl absolute top-0 right-0 w-32 h-32 bg-primary/5 -rotate-45 translate-x-16 -translate-y-16"></div>
-              <h2 className="font-headline text-2xl font-bold mb-6 flex items-center gap-3">
-                <span className="text-primary">01</span> Overview
+        <div className={`grid grid-cols-1 items-start ${isTerminalSplitLayout ? 'gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(34rem,0.9fr)]' : 'gap-8 lg:grid-cols-12'}`}>
+          <div className={`${isTerminalSplitLayout ? 'min-w-0 space-y-8' : 'min-w-0 space-y-8 lg:col-span-8'}`}>
+            <section className="relative overflow-hidden rounded-3xl border border-outline-variant/25 bg-surface-container-lowest p-6 shadow-soft sm:p-8">
+              <div className="absolute right-0 top-0 h-28 w-28 -translate-y-12 translate-x-12 rounded-full bg-primary/10"></div>
+              <h2 className="mb-6 flex items-center gap-3 font-headline text-2xl font-bold">
+                <span className="grid h-9 w-9 place-items-center rounded-full bg-primary/10 text-sm text-primary">01</span>
+                Overview
               </h2>
               <div
                 className="space-y-4 text-on-surface font-body leading-relaxed [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:tracking-tight [&_h1]:mt-8 [&_h1]:mb-4 [&_h2]:text-xl [&_h2]:font-bold [&_h2]:tracking-tight [&_h2]:mt-7 [&_h2]:mb-3 [&_h3]:text-lg [&_h3]:font-bold [&_h3]:mt-6 [&_h3]:mb-2 [&_p]:mb-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:mb-4 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:mb-4 [&_li]:mb-1.5 [&_pre]:bg-surface-container-high [&_pre]:border [&_pre]:border-outline-variant/30 [&_pre]:p-5 [&_pre]:overflow-x-auto [&_pre]:rounded-xl [&_pre]:my-5 [&_code]:font-mono [&_code]:text-[0.9em] [&_code]:bg-surface-container-highest [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_a]:text-primary [&_a]:underline [&_hr]:my-6 [&_hr]:border-outline-variant/40 [&_blockquote]:border-l-4 [&_blockquote]:border-primary/40 [&_blockquote]:bg-surface-container-low [&_blockquote]:px-4 [&_blockquote]:py-3 [&_blockquote]:my-4 [&_table]:w-full [&_table]:border-collapse [&_table]:my-5 [&_th]:text-left [&_th]:text-xs [&_th]:tracking-normal [&_th]:font-headline [&_th]:bg-surface-container-high [&_th]:p-3 [&_th]:border [&_th]:border-outline-variant/30 [&_td]:p-3 [&_td]:border [&_td]:border-outline-variant/30"
@@ -1069,14 +1088,15 @@ function CoursePage() {
               </div>
             </section>
 
-            <section className="p-2 border-l border-outline-variant/30">
-              <h2 className="font-headline text-2xl font-bold mb-6 flex items-center gap-3 pl-6">
-                <span className="text-primary">02</span>
+            <section className="rounded-3xl border border-outline-variant/25 bg-surface-container-lowest p-6 shadow-soft sm:p-8">
+              <h2 className="mb-6 flex items-center gap-3 font-headline text-2xl font-bold">
+                <span className="grid h-9 w-9 place-items-center rounded-full bg-primary/10 text-sm text-primary">02</span>
                 Topic briefing
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pl-6">
-                <div className="rounded-2xl bg-surface-container-low p-6">
-                  <h3 className="font-headline text-xs font-bold text-primary mb-3">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-low p-6">
+                  <h3 className="mb-3 flex items-center gap-2 font-headline text-xs font-bold uppercase tracking-wider text-primary">
+                    <span className="material-symbols-outlined text-base">menu_book</span>
                     Definition
                   </h3>
                   <div
@@ -1084,8 +1104,9 @@ function CoursePage() {
                     dangerouslySetInnerHTML={{ __html: vulnerabilityDefinitionMarkup }}
                   ></div>
                 </div>
-                <div className="rounded-2xl bg-surface-container-low p-6">
-                  <h3 className="font-headline text-xs font-bold text-primary mb-3">
+                <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-low p-6">
+                  <h3 className="mb-3 flex items-center gap-2 font-headline text-xs font-bold uppercase tracking-wider text-primary">
+                    <span className="material-symbols-outlined text-base">insights</span>
                     Impact
                   </h3>
                   <div
@@ -1096,9 +1117,10 @@ function CoursePage() {
               </div>
             </section>
 
-            <section className="rounded-2xl bg-surface-container-lowest p-8">
-              <h2 className="font-headline text-2xl font-bold mb-6 flex items-center gap-3">
-                <span className="text-primary">03</span> Deep dive
+            <section className="rounded-3xl border border-outline-variant/25 bg-surface-container-lowest p-6 shadow-soft sm:p-8">
+              <h2 className="mb-6 flex items-center gap-3 font-headline text-2xl font-bold">
+                <span className="grid h-9 w-9 place-items-center rounded-full bg-primary/10 text-sm text-primary">03</span>
+                Deep dive
               </h2>
               <div className="space-y-6">
                 <div
@@ -1238,7 +1260,7 @@ function CoursePage() {
             </section>
           </div>
 
-          <div className={`${isTerminalSplitLayout ? 'xl:col-start-2 space-y-8' : 'lg:col-span-4 space-y-8'}`}>
+          <aside className={`${isTerminalSplitLayout ? 'space-y-6 xl:col-start-2' : 'space-y-6 lg:sticky lg:top-28 lg:col-span-4'}`}>
             {isTerminalSplit ? (
               <div className={`${isTerminalMinimized ? 'fixed -left-[10000px] top-0 h-[640px] w-[640px] overflow-hidden opacity-0 pointer-events-none' : 'min-h-[560px] xl:min-h-[640px]'}`}>
                 <div className="flex h-[min(72vh,48rem)] min-h-[560px] flex-col border border-outline-variant bg-surface-container-lowest text-on-surface shadow-2xl xl:h-[calc(100vh-7rem)]">
@@ -1310,61 +1332,76 @@ Interactive sandbox terminal waiting for Docker spawn.`}
               </div>
             ) : null}
 
-            <div className="rounded-2xl bg-secondary text-on-secondary p-8">
-              <h2 className="font-headline text-xl font-bold mb-6 flex items-center gap-3 tracking-tight">
-                <span className="material-symbols-outlined">shield_with_heart</span>{' '}
-                Further reading
-              </h2>
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-secondary to-primary p-7 text-on-secondary shadow-soft">
+              <div className="pointer-events-none absolute -right-12 -top-14 h-40 w-40 rounded-full bg-white/10"></div>
+              <div className="relative">
+                <p className="mb-3 font-headline text-[10px] font-bold uppercase tracking-[0.18em] text-on-secondary/70">
+                  Continue learning
+                </p>
+                <h2 className="mb-5 flex items-center gap-3 font-headline text-xl font-bold tracking-tight">
+                  <span className="grid h-9 w-9 place-items-center rounded-full bg-white/15">
+                    <span className="material-symbols-outlined text-xl">auto_stories</span>
+                  </span>
+                  Further reading
+                </h2>
               <div
                 className="font-body text-sm leading-relaxed [&_h1]:text-xl [&_h1]:font-bold [&_h1]:mb-3 [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mb-2 [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-3 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:mb-1.5 [&_pre]:bg-black/20 [&_pre]:border [&_pre]:border-white/10 [&_pre]:p-4 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:my-4 [&_code]:font-mono [&_code]:bg-black/20 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_blockquote]:border-l-4 [&_blockquote]:border-white/25 [&_blockquote]:pl-3 [&_blockquote]:my-3"
                 dangerouslySetInnerHTML={{ __html: remediationProtocolsMarkup }}
               ></div>
+              </div>
             </div>
 
-            <div className="rounded-2xl bg-surface-container-low p-8 border-t-2 border-primary">
-              <div className="grid grid-cols-2 gap-6 mb-8">
+            <div className="rounded-3xl border border-outline-variant/25 bg-surface-container-lowest p-6 shadow-soft">
+              <div className="mb-5 flex items-center justify-between gap-3 border-b border-outline-variant/25 pb-4">
                 <div>
-                  <p className="font-headline text-xs text-on-surface-variant mb-1">
+                  <p className="font-headline text-[10px] font-bold uppercase tracking-[0.16em] text-primary">At a glance</p>
+                  <h2 className="mt-1 font-headline text-lg font-extrabold text-on-background">Skill details</h2>
+                </div>
+                <span className="material-symbols-outlined text-2xl text-primary">dataset</span>
+              </div>
+              <div className="mb-6 grid grid-cols-2 gap-3">
+                <div className="rounded-2xl bg-surface-container-low p-4">
+                  <p className="mb-1 font-headline text-[11px] text-on-surface-variant">
                     Difficulty
                   </p>
-                  <p className="font-headline font-bold text-lg">
+                  <p className="font-headline text-sm font-bold text-on-surface">
                     {(room.difficulty || room.level || 'N/A').toUpperCase()}
                   </p>
                 </div>
-                <div>
-                  <p className="font-headline text-xs text-on-surface-variant mb-1">
-                    Estimated Time
+                <div className="rounded-2xl bg-surface-container-low p-4">
+                  <p className="mb-1 font-headline text-[11px] text-on-surface-variant">
+                    Duration
                   </p>
-                  <p className="font-headline font-bold text-lg">{(room.estimateTime || 'N/A').toUpperCase()}</p>
+                  <p className="font-headline text-sm font-bold text-on-surface">{(room.estimateTime || 'N/A').toUpperCase()}</p>
                 </div>
-                <div>
-                  <p className="font-headline text-xs text-on-surface-variant mb-1">
+                <div className="rounded-2xl bg-surface-container-low p-4">
+                  <p className="mb-1 font-headline text-[11px] text-on-surface-variant">
                     Environment
                   </p>
-                  <p className="font-headline font-bold text-lg">{(room.environment || 'N/A').toUpperCase()}</p>
+                  <p className="font-headline text-sm font-bold text-on-surface">{(room.environment || 'N/A').toUpperCase()}</p>
                 </div>
-                <div>
-                  <p className="font-headline text-xs text-on-surface-variant mb-1">
+                <div className="rounded-2xl bg-surface-container-low p-4">
+                  <p className="mb-1 font-headline text-[11px] text-on-surface-variant">
                     XP Reward
                   </p>
-                  <p className="font-headline font-bold text-lg">{(room.xp || 'N/A').toUpperCase()}</p>
+                  <p className="font-headline text-sm font-bold text-on-surface">{(room.xp || 'N/A').toUpperCase()}</p>
                 </div>
-                <div>
-                  <p className="font-headline text-xs text-on-surface-variant mb-1">
-                    Room Type
+                <div className="col-span-2 rounded-2xl bg-surface-container-low p-4">
+                  <p className="mb-1 font-headline text-[11px] text-on-surface-variant">
+                    Skill Type
                   </p>
-                  <p className="font-headline font-bold text-lg">{roomType.toUpperCase()}</p>
+                  <p className="font-headline text-sm font-bold text-on-surface">{roomType.toUpperCase()}</p>
                 </div>
               </div>
               {roomAttachment?.dataUrl ? (
                 <a
-                  className="rounded-2xl mb-8 flex items-center justify-between gap-4 bg-surface-container-high p-4  hover:bg-surface-container-highest transition-colors"
+                  className="mb-6 flex items-center justify-between gap-4 rounded-2xl border border-outline-variant/20 bg-surface-container-low p-4 transition-colors hover:bg-surface-container-high"
                   download={roomAttachment.name || 'lab-file'}
                   href={roomAttachment.dataUrl}
                 >
                   <span>
                     <span className="block font-headline text-xs font-bold text-secondary">
-                      Lab File
+                      Skill file
                     </span>
                     <span className="mt-1 block text-sm text-on-surface">
                       {roomAttachment.name || 'Download attachment'}
@@ -1376,16 +1413,16 @@ Interactive sandbox terminal waiting for Docker spawn.`}
                   <span className="material-symbols-outlined text-secondary">download</span>
                 </a>
               ) : null}
-              <div className="space-y-4">
-                <h3 className="font-headline text-xs font-extrabold text-primary border-b border-primary/20 pb-2">
-                  Required Keywords
+              <div className="space-y-3">
+                <h3 className="font-headline text-xs font-extrabold uppercase tracking-wider text-primary">
+                  Key concepts
                 </h3>
                 <div className="flex flex-wrap gap-2">
                   {keywordTags.length > 0 ? (
                     keywordTags.map((keyword) => (
                       <span
                         key={keyword}
-                        className="rounded-full text-xs font-headline border border-outline-variant px-2 py-1"
+                        className="rounded-full border border-outline-variant/50 bg-surface-container-low px-3 py-1.5 font-headline text-xs"
                       >
                         {keyword}
                       </span>
@@ -1691,7 +1728,7 @@ Interactive sandbox terminal waiting for Docker spawn.`}
                         AI is preparing questions for you
                       </h3>
                       <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
-                        Your theoretical assessment is being generated from this room and your learner profile.
+                        Your theoretical assessment is being generated from this skill and your learner profile.
                       </p>
                     </div>
                   </div>
@@ -1894,47 +1931,53 @@ Interactive sandbox terminal waiting for Docker spawn.`}
                 </div>
               ) : null}
 
-              <div className="rounded-2xl bg-surface-container-low p-4 ">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-headline text-xs font-bold text-on-surface-variant">
-                    Lab Status
-                  </span>
-                  <span className={`text-xs font-headline font-bold px-2 py-1 ${labStatus === 'completed' ? 'bg-secondary/15 text-secondary' : 'bg-primary/10 text-primary'}`}>
-                    {labStatus === 'completed' ? 'Completed' : 'In Progress'}
-                  </span>
-                </div>
-
-                <div className="mt-3 flex gap-2">
-                  {labStatus !== 'completed' ? (
-                    <button
-                      className="rounded-full w-full py-3 bg-secondary text-on-secondary font-headline text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-60"
-                      disabled={isPreparingTheoreticalQuestions || (questionStatus.enabled && !questionStatus.allCorrect)}
-                      onClick={handleMarkComplete}
-                      type="button"
-                    >
-                      {isPreparingTheoreticalQuestions ? 'Preparing Assessment...' : 'Mark Complete'}
-                    </button>
-                  ) : (
-                    <button
-                      className="rounded-xl w-full py-3 bg-surface-container-high text-on-surface font-headline text-xs font-bold"
-                      onClick={handleMarkIncomplete}
-                      type="button"
-                    >
-                      Mark Incomplete
-                    </button>
-                  )}
-                </div>
-                {completionError ? (
-                  <p className="mt-2 text-xs text-error">{completionError}</p>
-                ) : null}
-              </div>
             </div>
 
-          </div>
+          </aside>
         </div>
 
-        <div className="px-5 sm:px-8 lg:px-10 pb-10">
+        <div className="mt-8 grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
           <CourseEnrollmentPanel courseTitle={room?.title} roomId={room?.id} />
+          <section className="flex flex-col justify-center rounded-3xl bg-surface-container-lowest p-6 shadow-soft">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="font-headline text-xs font-bold uppercase tracking-wide text-on-surface-variant">
+                  Skill status
+                </p>
+                <p className="mt-1 font-headline text-lg font-extrabold text-on-background">
+                  {labStatus === 'completed' ? 'Completed' : 'In progress'}
+                </p>
+              </div>
+              <span
+                className={`material-symbols-outlined text-3xl ${labStatus === 'completed' ? 'text-secondary' : 'text-primary'}`}
+              >
+                {labStatus === 'completed' ? 'verified' : 'pending'}
+              </span>
+            </div>
+            <div className="mt-4">
+              {labStatus !== 'completed' ? (
+                <button
+                  className="w-full rounded-full bg-secondary px-5 py-3 font-headline text-sm font-bold text-on-secondary transition-opacity hover:opacity-90 disabled:opacity-60"
+                  disabled={isPreparingTheoreticalQuestions || (questionStatus.enabled && !questionStatus.allCorrect)}
+                  onClick={handleMarkComplete}
+                  type="button"
+                >
+                  {isPreparingTheoreticalQuestions ? 'Preparing assessment...' : 'Mark skill complete'}
+                </button>
+              ) : (
+                <button
+                  className="w-full rounded-full bg-surface-container-high px-5 py-3 font-headline text-sm font-bold text-on-surface"
+                  onClick={handleMarkIncomplete}
+                  type="button"
+                >
+                  Mark skill incomplete
+                </button>
+              )}
+            </div>
+            {completionError ? (
+              <p className="mt-2 text-xs text-error">{completionError}</p>
+            ) : null}
+          </section>
         </div>
       </div>
     </main>

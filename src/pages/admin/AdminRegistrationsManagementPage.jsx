@@ -640,7 +640,7 @@ function AdminRegistrationsManagementPage() {
                         Role: <span className="font-bold">{user.role || 'operator'}</span>
                       </p>
                       <p className="text-sm text-on-surface-variant">
-                        Completed rooms:{' '}
+                        Completed skills:{' '}
                         <span className="font-bold text-on-surface">
                           {Number(user.completed_rooms || 0)}
                         </span>

@@ -128,12 +128,12 @@ function LearningPathsPage({ allowFeaturedPath = true }) {
       : rooms.map((room) => ({
           ...room,
           modulePhase: 'Catalog',
-          moduleTitle: 'Room Catalog',
+          moduleTitle: 'Skill Catalog',
           pathTitle: 'Unassigned',
         }))
   const emptyModulesMessage = isLoading
     ? 'Loading curriculum modules...'
-    : 'No rooms available for curriculum modules.'
+    : 'No skills available for curriculum modules.'
 
   return (
     <>
@@ -311,7 +311,7 @@ function LearningPathsPage({ allowFeaturedPath = true }) {
                   >
                     <div className="flex justify-between items-start mb-8">
                       <span className={`font-headline text-xs font-bold px-3 py-1 ${tone.badge}`}>
-                        {room.categoryTag || room.category || room.moduleTitle || 'Room'}
+                        {room.categoryTag || room.category || room.moduleTitle || 'Skill'}
                       </span>
                       <span className={`material-symbols-outlined ${isFeatured ? 'text-neutral-300' : tone.text}`}>
                         {isFeatured ? 'star' : tone.icon}
@@ -321,7 +321,7 @@ function LearningPathsPage({ allowFeaturedPath = true }) {
                       {room.title}
                     </h4>
                     <p className={`text-xs text-on-surface-variant leading-relaxed ${isFeatured ? 'mb-6' : 'mb-5'}`}>
-                      {room.description || 'No room description configured yet.'}
+                      {room.description || 'No skill description configured yet.'}
                     </p>
                     <div className="mt-auto flex items-end justify-between gap-4">
                       <div className="flex flex-wrap gap-4">

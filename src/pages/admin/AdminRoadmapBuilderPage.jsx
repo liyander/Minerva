@@ -500,7 +500,7 @@ function AdminRoadmapBuilderPage() {
                           </span>
                           <div className="min-w-0 flex-1">
                             <p className="font-headline text-xs font-bold text-on-surface-variant">
-                              {module.phase || normalizePhase(index)} / {(module.rooms || []).length} rooms
+                              {module.phase || normalizePhase(index)} / {(module.rooms || []).length} skills
                             </p>
                             <h4 className="mt-1 line-clamp-2 font-headline text-sm font-extrabold text-on-background">
                               {module.title}
@@ -628,7 +628,7 @@ function AdminRoadmapBuilderPage() {
                             </span>
                             <div className="min-w-0 flex-1">
                               <p className="font-headline text-xs font-bold text-on-surface-variant">
-                                {module.phase || normalizePhase(index)} / {(module.rooms || []).length} rooms
+                                {module.phase || normalizePhase(index)} / {(module.rooms || []).length} skills
                               </p>
                               <h4 className="mt-1 line-clamp-2 font-headline text-sm font-extrabold text-on-background">
                                 {module.title}

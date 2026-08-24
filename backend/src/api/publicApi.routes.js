@@ -659,7 +659,7 @@ async function fetchRoomById(identifier) {
       aiQuestionsEnabled: Boolean(room.practical_ai_questions_enabled),
       attachment: room.attachment_data
         ? {
-            name: room.attachment_name || 'room-file',
+            name: room.attachment_name || 'skill-file',
             type: room.attachment_type || 'application/octet-stream',
             size: Number(room.attachment_size || 0),
             dataUrl: room.attachment_data,
@@ -986,7 +986,7 @@ router.get('/rooms/:identifier', requirePublicApiKey, async (req, res, next) => 
   try {
     const room = await fetchRoomById(req.params.identifier)
     if (!room) {
-      return res.status(404).json({ message: 'Room not found' })
+      return res.status(404).json({ message: 'Skill not found' })
     }
 
     return res.json(room)

@@ -691,10 +691,10 @@ function AdminRegistrationDetailPage() {
                     Player audit trail
                   </p>
                   <h2 className="mt-2 font-headline text-xl font-bold tracking-tight">
-                    Room Activity & Answer Logs
+                    Skill Activity & Answer Logs
                   </h2>
                   <p className="mt-2 text-sm text-on-surface-variant">
-                    Review completed and in-progress rooms, submitted answers, interview bonus responses, and AI evaluation notes.
+                    Review completed and in-progress skills, submitted answers, interview bonus responses, and AI evaluation notes.
                   </p>
                 </div>
                 <div className="grid grid-cols-3 gap-3 min-w-72">
@@ -886,7 +886,7 @@ function AdminRegistrationDetailPage() {
                             ))
                           ) : (
                             <p className="rounded-2xl bg-surface-container-lowest p-4 text-sm text-on-surface-variant">
-                              No answer logs were recorded for this room yet.
+                              No answer logs were recorded for this skill yet.
                             </p>
                           )}
                         </div>
@@ -896,7 +896,7 @@ function AdminRegistrationDetailPage() {
                 </div>
               ) : (
                 <p className="rounded-2xl bg-surface-container-high p-4 text-sm text-on-surface-variant">
-                  This player has not started any rooms yet.
+                  This learner has not started any skills yet.
                 </p>
               )}
             </section>
@@ -905,10 +905,10 @@ function AdminRegistrationDetailPage() {
               <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                 <div>
                   <h2 className="font-headline text-xl font-bold tracking-tight">
-                    Completed Rooms
+                    Completed Skills
                   </h2>
                   <p className="mt-2 text-sm text-on-surface-variant">
-                    Rooms this player has completed, including completion time, XP, and AI scores where available.
+                    Skills this learner has completed, including completion time, XP, and AI scores where available.
                   </p>
                 </div>
                 <div className="grid grid-cols-2 gap-3 min-w-64">
@@ -950,7 +950,7 @@ function AdminRegistrationDetailPage() {
                     <thead className="bg-surface-container-high">
                       <tr>
                         <th className="px-4 py-3 font-headline text-xs text-on-surface-variant">
-                          Room
+                          Skill
                         </th>
                         <th className="px-4 py-3 font-headline text-xs text-on-surface-variant">
                           Category
@@ -1002,7 +1002,7 @@ function AdminRegistrationDetailPage() {
                 </div>
               ) : (
                 <p className="rounded-2xl bg-surface-container-high p-4 text-sm text-on-surface-variant">
-                  This player has not completed any rooms yet.
+                  This learner has not completed any skills yet.
                 </p>
               )}
             </section>

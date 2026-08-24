@@ -40,7 +40,7 @@ function summarizeRoom(room) {
   }
 
   const parts = [
-    room.title ? `Room: ${room.title}` : '',
+    room.title ? `Skill: ${room.title}` : '',
     room.category ? `Category: ${room.category}` : '',
     room.difficulty ? `Difficulty: ${room.difficulty}` : '',
     room.estimateTime ? `Estimated time: ${room.estimateTime}` : '',

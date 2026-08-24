@@ -705,7 +705,7 @@ function SettingsPage() {
                 Skills, Internships & Stack
               </h2>
               <p className="mt-2 text-sm text-on-surface-variant">
-                These details are used with completed rooms, projects, achievements, and certificates to generate job recommendations.
+                These details are used with completed skills, projects, achievements, and certificates to generate job recommendations.
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

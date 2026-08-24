@@ -134,11 +134,11 @@ function ModuleDetailPage() {
       <section className="max-w-4xl">
         <header className="flex items-center justify-between mb-8">
           <h2 className="text-2xl font-extrabold font-headline tracking-tight">
-            Module Rooms
+            Module Skills
           </h2>
           <div className="h-px flex-1 mx-8 bg-surface-container-highest"></div>
           <span className="text-xs font-headline text-outline">
-            {module.rooms?.length || 0} Rooms
+            {module.rooms?.length || 0} Skills
           </span>
         </header>
 
@@ -201,7 +201,7 @@ function ModuleDetailPage() {
         ) : (
           <div className="rounded-2xl bg-surface-container-low border border-dashed border-outline-variant/30 p-12 flex items-center justify-center">
             <span className="text-xs font-headline text-outline">
-              No rooms assigned to this module
+              No skills assigned to this module
             </span>
           </div>
         )}

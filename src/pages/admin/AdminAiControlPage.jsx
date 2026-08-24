@@ -12,7 +12,7 @@ import { parseMarkdownToHtml } from '../../utils/markdown'
 
 const STARTER_PROMPTS = [
   'Give me platform insights and top risks right now.',
-  'Add a new room for phishing incident response at Medium level.',
+  'Add a new skill for phishing incident response at Medium level.',
   'Create a career path for Cloud Security Operations.',
   'Add a module to full-stack-developer about web payload validation.',
 ]
@@ -270,7 +270,7 @@ function AdminAiControlPage() {
             Admin AI Control Center
           </h1>
           <p className="text-sm text-on-surface-variant mt-4 max-w-3xl">
-            Monitor platform insights, chat with AI, and execute administrative content operations such as creating rooms, career paths, and modules.
+            Monitor platform insights, chat with AI, and execute administrative content operations such as creating skills, career paths, and modules.
           </p>
         </header>
 
@@ -350,7 +350,7 @@ function AdminAiControlPage() {
               <div className="space-y-4 text-sm">
                 <div className="grid grid-cols-2 gap-2">
                   <div className="rounded-xl bg-surface-container-high p-3">
-                    <p className="text-xs text-on-surface-variant">Courses</p>
+                    <p className="text-xs text-on-surface-variant">Skills</p>
                     <p className="font-headline text-xl font-bold">{insights?.metrics?.rooms ?? 0}</p>
                   </div>
                   <div className="rounded-xl bg-surface-container-high p-3">

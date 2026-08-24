@@ -222,7 +222,7 @@ function LearningPathDetailPage({ pathId: propPathId }) {
                   <div className="h-full bg-primary transition-all duration-500" style={{ width: `${completionPercentage}%` }}></div>
                 </div>
                 <p className="text-xs font-headline text-on-surface-variant mb-3">
-                  {completedRooms}/{totalRooms} Rooms Completed
+                  {completedRooms}/{totalRooms} Skills Completed
                 </p>
                 <button className="rounded-full w-full bg-primary text-on-primary py-4 font-headline font-bold hover:opacity-90 transition-all active:scale-95" onClick={handleResumeOperation} type="button">
                   RESUME OPERATION
@@ -240,7 +240,7 @@ function LearningPathDetailPage({ pathId: propPathId }) {
               </h2>
               <div className="h-px flex-1 mx-8 bg-surface-container-highest"></div>
               <span className="text-xs font-headline text-outline">
-                {getModuleCount()} Modules - {getTotalRooms()} Rooms
+                {getModuleCount()} Modules - {getTotalRooms()} Skills
               </span>
             </header>
 
@@ -302,7 +302,7 @@ function LearningPathDetailPage({ pathId: propPathId }) {
                       ) : (
                         <div className="rounded-2xl bg-surface-container-low border border-dashed border-outline-variant/30 p-6 flex items-center justify-center">
                           <span className="text-xs font-headline text-outline">
-                            No rooms assigned to this module
+                            No skills assigned to this module
                           </span>
                         </div>
                       )}
@@ -379,7 +379,7 @@ function LearningPathDetailPage({ pathId: propPathId }) {
                   </p>
                   <div className="bg-surface-container-highest/50 p-3 rounded border border-outline-variant/30 text-left">
                     <p className="text-xs text-on-surface-variant">
-                      <span className="font-bold">Progress:</span> {completedRooms}/{totalRooms} rooms completed
+                      <span className="font-bold">Progress:</span> {completedRooms}/{totalRooms} skills completed
                     </p>
                   </div>
                 </div>

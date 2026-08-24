@@ -6,7 +6,7 @@ const curatedAiModels = [
     id: 'moonshotai/kimi-k2-thinking',
     label: 'Kimi K2 Thinking',
     provider: 'NVIDIA',
-    description: 'Default reasoning model for room generation, evaluation, and platform assistants.',
+    description: 'Default reasoning model for skill generation, evaluation, and platform assistants.',
   },
   {
     id: 'openai/gpt-oss-20b',

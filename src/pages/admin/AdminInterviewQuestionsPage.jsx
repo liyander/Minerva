@@ -103,10 +103,10 @@ function AdminInterviewQuestionsPage() {
               Matching Rules
             </p>
             <h2 className="mt-2 font-headline text-xl font-extrabold tracking-tight">
-              Room-Aware Placement
+              Skill-Aware Placement
             </h2>
             <p className="mt-4 text-sm leading-relaxed text-on-surface-variant">
-              AI compares each question with room title, category, description, markdown, mission overview, and deep-dive content.
+              AI compares each question with skill title, category, description, learning content, mission overview, and deep-dive content.
             </p>
             <p className="mt-3 text-sm leading-relaxed text-on-surface-variant">
               If AI is unavailable, a local keyword matcher still inserts the question into the closest room.
@@ -122,7 +122,7 @@ function AdminInterviewQuestionsPage() {
                   Insertion Result
                 </p>
                 <h2 className="font-headline text-2xl font-extrabold tracking-tight">
-                  Matched Rooms
+                  Matched Skills
                 </h2>
               </div>
               <span className="font-headline text-xs font-bold text-secondary">

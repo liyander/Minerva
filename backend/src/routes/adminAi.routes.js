@@ -74,7 +74,7 @@ function buildFallbackPlan(raw, userMessage, insights) {
   if (/^(hi|hello|hey|yo|sup)\b/i.test(prompt)) {
     return {
       assistantReply:
-        'Hi. I am Admin AI. I can monitor platform insights and create rooms, career paths, or modules when requested.',
+        'Hi. I am Admin AI. I can monitor platform insights and create skills, career paths, or modules when requested.',
       action: { type: 'none', payload: {} },
     }
   }
@@ -82,7 +82,7 @@ function buildFallbackPlan(raw, userMessage, insights) {
   if (/\b(what\s+is\s+this|what\s+can\s+you\s+do|help|who\s+are\s+you)\b/i.test(prompt)) {
     return {
       assistantReply:
-        `This is the Admin AI Control Center. Current totals: ${Number(metrics.rooms || 0)} rooms, ${Number(metrics.careerPaths || 0)} career paths, ${Number(metrics.modules || 0)} modules, ${Number(metrics.users || 0)} users. Ask me to monitor insights or create platform content.`,
+        `This is the Admin AI Control Center. Current totals: ${Number(metrics.rooms || 0)} skills, ${Number(metrics.careerPaths || 0)} career paths, ${Number(metrics.modules || 0)} modules, ${Number(metrics.users || 0)} users. Ask me to monitor insights or create platform content.`,
       action: { type: 'none', payload: {} },
     }
   }
@@ -90,7 +90,7 @@ function buildFallbackPlan(raw, userMessage, insights) {
   return {
     assistantReply:
       message ||
-      'I can help monitor platform insights and manage content. Ask for user lists, platform totals, or creation of rooms, career paths, and modules.',
+      'I can help monitor platform insights and manage content. Ask for user lists, platform totals, or creation of skills, career paths, and modules.',
     action: { type: 'none', payload: {} },
   }
 }
@@ -177,7 +177,7 @@ function extractRoleFilter(text) {
 }
 
 function hasExplicitContentCreationIntent(text) {
-  return /\b(add|create|generate|make|build)\b[\s\S]*\b(room|module|career\s*path|path|lab)\b/i.test(text)
+  return /\b(add|create|generate|make|build)\b[\s\S]*\b(room|skill|module|career\s*path|path|lab)\b/i.test(text)
 }
 
 function categoryMatchesRoleFilter(category, roleFilter) {
@@ -292,7 +292,7 @@ async function fetchPlayerPerformanceProfiles() {
       averageGrammar: player.grammarScores.length
         ? Math.round(player.grammarScores.reduce((sum, score) => sum + score, 0) / player.grammarScores.length)
         : 0,
-      topCategory: topCategory?.category || 'No completed rooms',
+      topCategory: topCategory?.category || 'No completed skills',
       recommendedRole: topCategory ? roleForCategory(topCategory.category) : 'Needs more data',
       categories,
     }
@@ -387,7 +387,7 @@ async function buildSinglePlayerInsightAnswer(text) {
     : []
   const strengths = topCategories.length
     ? topCategories.map((category) => `${category.category} (${category.completedRooms} completion(s), tech avg ${category.averageTechnical})`)
-    : ['Not enough completed room data yet.']
+    : ['Not enough completed skill data yet.']
   const improvementSignals = roomRows
     .filter((row) => Number(row.technical_score || 0) > 0 && Number(row.technical_score || 0) < 85)
     .slice(0, 3)
@@ -398,11 +398,11 @@ async function buildSinglePlayerInsightAnswer(text) {
     `- Registration: ${user.registration_number || 'Not set'}`,
     `- Email: ${user.email || 'Not set'}`,
     `- Status: ${user.is_active ? 'active' : 'inactive'}; role: ${user.role || 'operator'}`,
-    `- Completed rooms: ${completed.length}`,
-    `- In-progress rooms: ${inProgress.length}`,
+    `- Completed skills: ${completed.length}`,
+    `- In-progress skills: ${inProgress.length}`,
     `- Average technical score: ${profile?.averageTechnical || 0}`,
     `- Average grammar score: ${profile?.averageGrammar || 0}`,
-    `- Suitable role signal: ${profile?.recommendedRole || 'Needs more completed rooms'}`,
+    `- Suitable role signal: ${profile?.recommendedRole || 'Needs more completed skills'}`,
     '',
     'Strengths:',
     ...strengths.map((item) => `- ${item}`),
@@ -410,14 +410,14 @@ async function buildSinglePlayerInsightAnswer(text) {
     'Improve next:',
     ...(improvementSignals.length
       ? improvementSignals.map((item) => `- ${item}`)
-      : ['- Complete more rooms and answer theoretical questions with specific, room-based details.']),
+      : ['- Complete more skills and answer theoretical questions with specific, skill-based details.']),
     '',
-    'Recent rooms:',
+    'Recent skills:',
     ...(roomRows.length
       ? roomRows.slice(0, 6).map((row) =>
           `- ${row.title} (${row.category || 'Uncategorized'}): ${row.completed_at ? 'completed' : row.started_at ? 'in progress' : 'not started'}${Number(row.technical_score || 0) ? `, tech ${Number(row.technical_score)}` : ''}`,
         )
-      : ['- No room activity found.']),
+      : ['- No skill activity found.']),
   ].join('\n')
 }
 
@@ -451,7 +451,7 @@ function buildTopRisks(insights) {
   }
 
   if (Number(metrics.rooms || 0) < 5) {
-    risks.push('Lab room inventory is small, which can reduce practice variety and learner retention.')
+    risks.push('Skill inventory is small, which can reduce learning variety and learner retention.')
   }
 
   if (Number(metrics.modules || 0) < Number(metrics.careerPaths || 0)) {
@@ -495,7 +495,7 @@ async function buildPlayerStatsAnswer(text) {
     }
 
     lines.push(
-      `- ${player.username}: ${roleFilter ? scopedCompleted : player.completedRooms} completed room(s), ` +
+      `- ${player.username}: ${roleFilter ? scopedCompleted : player.completedRooms} completed skill(s), ` +
         `technical avg ${roleFilter ? avgTechnical : player.averageTechnical}, ` +
         `grammar avg ${roleFilter ? avgGrammar : player.averageGrammar}, ` +
         `recommended role: ${player.recommendedRole}`,
@@ -568,7 +568,7 @@ async function tryHandleDirectAdminQuery(message, insights) {
       role: 'assistant',
       content: [
         'Platform insights:',
-        `- Rooms: ${Number(metrics.rooms || 0)}`,
+        `- Skills: ${Number(metrics.rooms || 0)}`,
         `- Career paths: ${Number(metrics.careerPaths || 0)}`,
         `- Modules: ${Number(metrics.modules || 0)}`,
         `- CVEs: ${Number(metrics.cves || 0)}`,
@@ -751,7 +751,7 @@ async function createRoom(payload) {
   }
 
   if (!roomPayload.title) {
-    throw new Error('Room creation requires a title.')
+    throw new Error('Skill creation requires a title.')
   }
 
   await pool.query(
@@ -982,13 +982,13 @@ async function findExistingRoomByTitleOrSlug(titleOrSlug) {
 
 function buildTopicRoomContent(topic, roomTitle) {
   const cleanTopic = String(topic || roomTitle || 'Cybersecurity Monitoring').trim()
-  const title = String(roomTitle || cleanTopic || 'Monitoring Room').trim()
+  const title = String(roomTitle || cleanTopic || 'Monitoring Skill').trim()
 
   if (/http\s+request\s+smuggling|request\s+smuggling|desync/i.test(`${title} ${cleanTopic}`)) {
     const markdown = [
       `# ${title}`,
       '',
-      'This room focuses on HTTP request smuggling risks in multi-tier web stacks where frontend and backend components parse requests differently.',
+      'This skill focuses on HTTP request smuggling risks in multi-tier web stacks where frontend and backend components parse requests differently.',
       '',
       '## Mission Overview',
       'Identify parser desynchronization conditions, validate impact safely in lab conditions, and implement robust protocol-alignment controls.',
@@ -1029,7 +1029,7 @@ function buildTopicRoomContent(topic, roomTitle) {
   const markdown = [
     `# ${title}`,
     '',
-    `This room focuses on ${cleanTopic}. You will learn how to identify suspicious activity, triage alerts, and improve detection quality.`,
+    `This skill focuses on ${cleanTopic}. You will learn how to identify suspicious activity, triage alerts, and improve detection quality.`,
     '',
     '## Mission Overview',
     `Investigate telemetry related to ${cleanTopic}, separate noise from true positives, and document actionable findings.`,
@@ -1103,7 +1103,7 @@ function parseListValues(text) {
 }
 
 function parseRoomRefsFromText(text) {
-  const match = String(text || '').match(/(?:rooms?|with\s+rooms?)\s*[:=]?\s*(.+)$/i)
+  const match = String(text || '').match(/(?:(?:rooms?|skills?)|with\s+(?:rooms?|skills?))\s*[:=]?\s*(.+)$/i)
   if (!match?.[1]) {
     return []
   }
@@ -1148,7 +1148,7 @@ async function fillPendingModulePayload(payload, message) {
 
 function extractRoomTitleFromCreatePrompt(text) {
   const match = String(text || '').match(
-    /(?:add|create)\s+(?:a\s+)?room(?:\s+called|\s+named)?\s+(.+?)(?:\s+(?:and\s+add\s+content|with\s+content|which\b|that\b|for\s+the\s+path\b|in\s+the\s+path\b)|$)/i,
+    /(?:add|create)\s+(?:a\s+)?(?:room|skill)(?:\s+called|\s+named)?\s+(.+?)(?:\s+(?:and\s+add\s+content|with\s+content|which\b|that\b|for\s+the\s+path\b|in\s+the\s+path\b)|$)/i,
   )
   if (!match?.[1]) {
     return ''
@@ -1178,7 +1178,7 @@ function extractPathRefFromPrompt(text) {
 }
 
 function extractRoomTitleFromModulePrompt(text) {
-  const match = String(text || '').match(/(?:add|create)\s+(?:a\s+)?room(?:\s+called|\s+named)?\s+(.+?)(?:\s+(?:which|that)\b|$)/i)
+  const match = String(text || '').match(/(?:add|create)\s+(?:a\s+)?(?:room|skill)(?:\s+called|\s+named)?\s+(.+?)(?:\s+(?:which|that)\b|$)/i)
   if (!match?.[1]) {
     return ''
   }
@@ -1187,7 +1187,7 @@ function extractRoomTitleFromModulePrompt(text) {
 }
 
 function extractModuleTitleFromCompoundPrompt(text) {
-  const match = String(text || '').match(/(?:add|create)\s+(?:a\s+)?module(?:\s+called|\s+named)?\s+(.+?)(?:\s+in\s+which\b|\s+with\s+room\b|\s+which\s+includes\b|$)/i)
+  const match = String(text || '').match(/(?:add|create)\s+(?:a\s+)?module(?:\s+called|\s+named)?\s+(.+?)(?:\s+in\s+which\b|\s+with\s+(?:room|skill)\b|\s+which\s+includes\b|$)/i)
   if (!match?.[1]) {
     return ''
   }
@@ -1203,7 +1203,7 @@ function extractRoomContentFromPrompt(text) {
   }
 
   if (/(?:add\s+content|with\s+content|content\s+to\s+it)(?:\s+with\s+examples)?/i.test(input)) {
-    return 'Topic-focused room content with practical examples'
+    return 'Topic-focused skill content with practical examples'
   }
 
   return ''
@@ -1251,9 +1251,9 @@ async function tryHandleDirectActionIntent({ message, userId }) {
   }
 
   const isCreateModuleIntent = /\b(add|create)\b[\s\S]*\bmodule\b/i.test(lower)
-  const isCreateRoomIntent = /\b(add|create)\b[\s\S]*\broom\b/i.test(lower)
+  const isCreateRoomIntent = /\b(add|create)\b[\s\S]*\b(room|skill)\b/i.test(lower)
   const looksLikeFreshCompositeCommand =
-    (isCreateModuleIntent || isCreateRoomIntent) && /\b(in\s+the\s+path|path\b|module\s+called|room\s+called)\b/i.test(lower)
+    (isCreateModuleIntent || isCreateRoomIntent) && /\b(in\s+the\s+path|path\b|module\s+called|(?:room|skill)\s+called)\b/i.test(lower)
 
   if (looksLikeFreshCompositeCommand && pendingActionByUser.has(userId)) {
     pendingActionByUser.delete(userId)
@@ -1277,8 +1277,8 @@ async function tryHandleDirectActionIntent({ message, userId }) {
       return {
         role: 'assistant',
         content:
-          'Which room(s) should be linked to this module? Provide room ids/slugs/titles separated by commas.',
-        action: { type: 'create_module', status: 'needs_input', message: 'At least one room is required' },
+          'Which skill(s) should be linked to this module? Provide skill ids, slugs, or titles separated by commas.',
+        action: { type: 'create_module', status: 'needs_input', message: 'At least one skill is required' },
       }
     }
 
@@ -1341,8 +1341,8 @@ async function tryHandleDirectActionIntent({ message, userId }) {
 
       return {
         role: 'assistant',
-        content: 'Which room should be added to this module? Provide room title, id, or slug.',
-        action: { type: 'create_module', status: 'needs_input', message: 'At least one room is required' },
+        content: 'Which skill should be added to this module? Provide its title, id, or slug.',
+        action: { type: 'create_module', status: 'needs_input', message: 'At least one skill is required' },
       }
     }
 
@@ -1360,11 +1360,11 @@ async function tryHandleDirectActionIntent({ message, userId }) {
 
     return {
       role: 'assistant',
-      content: `Module '${createdModule.title}' ${createdModule.reused ? 'already existed and was reused' : 'created'} in ${createdModule.careerPathTitle}${path.createdNow ? ' (new path created)' : ''}. Room '${room.title}' ${room.reused ? 'was linked' : 'was created and linked'} with content context.`,
+      content: `Module '${createdModule.title}' ${createdModule.reused ? 'already existed and was reused' : 'created'} in ${createdModule.careerPathTitle}${path.createdNow ? ' (new path created)' : ''}. Skill '${room.title}' ${room.reused ? 'was linked' : 'was created and linked'} with content context.`,
       action: {
         type: 'create_module',
         status: 'completed',
-        message: `Module created: ${createdModule.title} (${createdModule.id}) in ${createdModule.careerPathTitle}; room linked: ${room.title} (${room.id})`,
+        message: `Module created: ${createdModule.title} (${createdModule.id}) in ${createdModule.careerPathTitle}; skill linked: ${room.title} (${room.id})`,
         created: {
           module: createdModule,
           room,
@@ -1378,14 +1378,14 @@ async function tryHandleDirectActionIntent({ message, userId }) {
     if (!title) {
       return {
         role: 'assistant',
-        content: 'What should the room title be?',
+        content: 'What should the skill title be?',
         action: { type: 'create_room', status: 'needs_input', message: 'title is required' },
       }
     }
 
     const contentHintRaw = extractRoomContentFromPrompt(text)
     const topicHint =
-      contentHintRaw && contentHintRaw !== 'Topic-focused room content with practical examples'
+      contentHintRaw && contentHintRaw !== 'Topic-focused skill content with practical examples'
         ? contentHintRaw
         : title
 
@@ -1396,11 +1396,11 @@ async function tryHandleDirectActionIntent({ message, userId }) {
 
     return {
       role: 'assistant',
-      content: `Room '${created.title}' ${created.reused ? 'was updated with' : 'has been created with'} detailed topic content and examples.`,
+      content: `Skill '${created.title}' ${created.reused ? 'was updated with' : 'has been created with'} detailed topic content and examples.`,
       action: {
         type: 'create_room',
         status: 'completed',
-        message: `Room created: ${created.title} (${created.id})`,
+        message: `Skill created: ${created.title} (${created.id})`,
         created,
       },
     }
@@ -1448,8 +1448,8 @@ async function tryHandleDirectActionIntent({ message, userId }) {
       return {
         role: 'assistant',
         content:
-          'Which room(s) should be linked to this module? Provide room ids/slugs/titles separated by commas.',
-        action: { type: 'create_module', status: 'needs_input', message: 'At least one room is required' },
+          'Which skill(s) should be linked to this module? Provide skill ids, slugs, or titles separated by commas.',
+        action: { type: 'create_module', status: 'needs_input', message: 'At least one skill is required' },
       }
     }
 
@@ -1485,7 +1485,7 @@ async function executeAction(action) {
   if (type === 'create_room') {
     const title = String(payload?.title || '').trim()
     if (!title) {
-      throw new Error('Room creation requires a title.')
+      throw new Error('Skill creation requires a title.')
     }
 
     const hasExplicitContent = Boolean(
@@ -1505,7 +1505,7 @@ async function executeAction(action) {
           description: String(payload?.description || title).trim(),
         })
 
-    return { type, status: 'completed', message: `Room created: ${created.title} (${created.id})`, created }
+    return { type, status: 'completed', message: `Skill created: ${created.title} (${created.id})`, created }
   }
 
   if (type === 'create_career_path') {

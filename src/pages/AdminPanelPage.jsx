@@ -302,7 +302,7 @@ function AdminPanelPage({ config, onConfigChange, onLogout, username }) {
             Content Management
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Experimental Rooms */}
+            {/* Skills */}
             <div className="rounded-2xl bg-surface-container-lowest shadow-soft p-6 hover:bg-surface-container-high transition-all cursor-pointer">
               <a className="block" href="/admin/courses">
                 <div className="flex items-start justify-between mb-4">
@@ -312,7 +312,7 @@ function AdminPanelPage({ config, onConfigChange, onLogout, username }) {
                     </span>
                     <div>
                       <h3 className="font-headline text-lg font-bold">
-                        Experimental Rooms
+                        Skills
                       </h3>
                       <p className="text-xs text-on-surface-variant">
                         Manage Lab Content
@@ -324,7 +324,7 @@ function AdminPanelPage({ config, onConfigChange, onLogout, username }) {
                   </span>
                 </div>
                 <p className="text-sm text-on-surface-variant">
-                  Configure available lab rooms, titles, descriptions, difficulty levels, and detailed markdown/HTML content for each room.
+                  Configure available skills, titles, descriptions, difficulty levels, and detailed learning content for each skill.
                 </p>
               </a>
             </div>
@@ -338,7 +338,7 @@ function AdminPanelPage({ config, onConfigChange, onLogout, username }) {
                     </span>
                     <div>
                       <h3 className="font-headline text-lg font-bold">
-                        Room Categories
+                        Skill Categories
                       </h3>
                       <p className="text-xs text-on-surface-variant">
                         Manage Specializations
@@ -350,7 +350,7 @@ function AdminPanelPage({ config, onConfigChange, onLogout, username }) {
                   </span>
                 </div>
                 <p className="text-sm text-on-surface-variant">
-                  Add specialization categories for room filters, room creation, and dynamic proficiency tracking.
+                  Add specialization categories for skill filters, skill creation, and dynamic proficiency tracking.
                 </p>
               </a>
             </div>
@@ -634,7 +634,7 @@ function AdminPanelPage({ config, onConfigChange, onLogout, username }) {
                         Interview Questions
                       </h3>
                       <p className="text-xs text-on-surface-variant">
-                        AI Room Matching
+                        AI Skill Matching
                       </p>
                     </div>
                   </div>
@@ -643,7 +643,7 @@ function AdminPanelPage({ config, onConfigChange, onLogout, username }) {
                   </span>
                 </div>
                 <p className="text-sm text-on-surface-variant">
-                  Add custom interview questions and let AI insert them into the best matching rooms as optional bonus challenges.
+                  Add custom interview questions and let AI insert them into the best matching skills as optional bonus challenges.
                 </p>
               </a>
             </div>
@@ -670,7 +670,7 @@ function AdminPanelPage({ config, onConfigChange, onLogout, username }) {
                   </span>
                 </div>
                 <p className="text-sm text-on-surface-variant">
-                  Chat with an admin-only AI to monitor platform insights and execute content operations such as creating rooms, career paths, and modules.
+                  Chat with an admin-only AI to monitor platform insights and execute content operations such as creating skills, career paths, and modules.
                 </p>
               </a>
             </div>
@@ -696,7 +696,7 @@ function AdminPanelPage({ config, onConfigChange, onLogout, username }) {
                   </span>
                 </div>
                 <p className="text-sm text-on-surface-variant">
-                  Review which seeded jobs are recommended to each student using completed rooms, internships, projects, certifications, tools, and skills.
+                  Review which seeded jobs are recommended to each student using completed skills, internships, projects, certifications, tools, and evidence.
                 </p>
               </a>
             </div>
@@ -786,7 +786,7 @@ function AdminPanelPage({ config, onConfigChange, onLogout, username }) {
 
               <ToggleRow
                 checked={config.features.labRooms}
-                description="Controls whether users can open specific lab room pages."
+                description="Controls whether users can open specific skill pages."
                 label="Lab Course Access"
                 onChange={(v) => setFeatureValue('labRooms', v)}
               />

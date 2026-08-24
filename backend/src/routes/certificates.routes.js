@@ -113,7 +113,7 @@ router.post('/issue', authenticate, async (req, res) => {
   const completionState = await fetchCompletionState(req.user.id, path)
   if (!completionState.isComplete) {
     return res.status(400).json({
-      message: 'Complete every room in this path before issuing a certificate.',
+      message: 'Complete every skill in this path before issuing a certificate.',
       completionState,
     })
   }

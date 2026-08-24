@@ -155,7 +155,7 @@ function AdminCourseEditorPage() {
             onClick={() => navigate('/admin/courses')}
             type="button"
           >
-            Back to Rooms
+            Back to Skills
           </button>
         </div>
       </main>
@@ -164,7 +164,7 @@ function AdminCourseEditorPage() {
 
   const handleSave = () => {
     if (!formData.title?.trim()) {
-      setErrorMessage('Room title is required.')
+      setErrorMessage('Skill title is required.')
       return
     }
 
@@ -378,11 +378,11 @@ function AdminCourseEditorPage() {
               <span className="material-symbols-outlined">arrow_back</span>
             </button>
             <span className="font-headline text-xs text-primary font-bold">
-              Room Configuration
+              Skill Configuration
             </span>
           </div>
           <h1 className="font-headline text-4xl md:text-5xl font-extrabold tracking-tight">
-            {isNewRoom ? 'Create Experimental Room' : `Edit: ${formData.title || 'Untitled Room'}`}
+            {isNewRoom ? 'Create Skill' : `Edit: ${formData.title || 'Untitled Skill'}`}
           </h1>
           <div className="mt-6 flex gap-3">
             <button
@@ -400,7 +400,7 @@ function AdminCourseEditorPage() {
                   Saved
                 </>
               ) : (
-                isNewRoom ? 'Create Room' : 'Save Changes'
+                isNewRoom ? 'Create Skill' : 'Save Changes'
               )}
             </button>
             <button
@@ -449,7 +449,7 @@ function AdminCourseEditorPage() {
             ) : (
               <div className="p-8 rounded-2xl bg-surface-container-lowest text-center">
                 <p className="text-sm text-on-surface-variant font-medium">
-                  Please save the room basic info first to manage candidate videos and playlist.
+                  Please save the skill details first to manage candidate videos and its playlist.
                 </p>
               </div>
             )}
@@ -461,13 +461,13 @@ function AdminCourseEditorPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <section className="rounded-2xl bg-surface-container-lowest p-8">
               <h2 className="font-headline text-xl font-bold tracking-tight mb-6">
-                Room Details
+                Skill Details
               </h2>
 
               <div className="space-y-6">
                 <div>
                   <label className="block font-headline text-xs font-bold mb-2">
-                    Room Title
+                    Skill Title
                   </label>
                   <input
                     className="rounded-xl w-full bg-surface-container-highest  focus:ring-0 font-body text-sm py-3 px-4 outline-none"
@@ -494,7 +494,7 @@ function AdminCourseEditorPage() {
 
                 <div>
                   <label className="block font-headline text-xs font-bold mb-2">
-                    Room Type
+                    Skill Type
                   </label>
                   <select
                     className="rounded-xl w-full bg-surface-container-highest  focus:ring-0 font-body text-sm py-3 px-4 outline-none"
@@ -506,7 +506,7 @@ function AdminCourseEditorPage() {
                     <option value="practical">Practical</option>
                   </select>
                   <p className="text-xs text-on-surface-variant mt-2">
-                    Theoretical rooms use AI-generated questions per learner. Practical rooms use manually configured exact-answer checks.
+                    Theoretical skills use AI-generated questions per learner. Practical skills use manually configured exact-answer checks.
                   </p>
                 </div>
 
@@ -661,7 +661,7 @@ function AdminCourseEditorPage() {
                 </div>
                 <div className="mt-4 text-xs text-on-surface-variant space-y-1">
                   <p>Difficulty: {formData.difficulty || formData.level || 'N/A'}</p>
-                  <p>Room Type: {normalizeRoomType(formData.roomType).toUpperCase()}</p>
+                  <p>Skill Type: {normalizeRoomType(formData.roomType).toUpperCase()}</p>
                   <p>Estimated Time: {formData.estimateTime || 'N/A'}</p>
                   <p>Environment: {formData.environment || 'N/A'}</p>
                   <p>Tags: {splitCommaList(tagsInput).join(', ') || 'N/A'}</p>
@@ -851,7 +851,7 @@ function AdminCourseEditorPage() {
               {normalizeRoomType(formData.roomType) === 'practical' ? (
                 <div className="rounded-2xl mb-8 bg-surface-container-high p-6 ">
                   <p className="font-headline text-xs font-bold text-primary mb-3">
-                    Practical Room File
+                    Practical Skill File
                   </p>
                   <input
                     className="rounded-lg block w-full text-sm text-on-surface-variant file:mr-4 file:border-0 file:bg-primary file:px-4 file:py-2 file:font-headline file:text-xs file:font-bold file: file:tracking-normal file:text-on-primary"
@@ -1075,7 +1075,7 @@ function AdminCourseEditorPage() {
                           Expose Uploaded File In Terminal
                         </span>
                         <span className="mt-1 block text-xs text-on-surface-variant">
-                          Copies the uploaded practical-room file into /challenge for file-based labs. Leave disabled for web challenges so source files are not intentionally exposed through the terminal.
+                          Copies the uploaded practical-skill file into /challenge for file-based labs. Leave disabled for web challenges so source files are not intentionally exposed through the terminal.
                         </span>
                       </span>
                     </label>
@@ -1099,7 +1099,7 @@ function AdminCourseEditorPage() {
               ) : null}
 
               <p className="text-xs text-on-surface-variant mb-6">
-                Theoretical rooms generate AI questions automatically for each learner. Practical rooms can use exact-answer questions, optional AI evaluation, uploaded files, and Docker-backed services.
+                Theoretical skills generate AI questions automatically for each learner. Practical skills can use exact-answer questions, optional AI evaluation, uploaded files, and Docker-backed services.
               </p>
 
               {normalizeRoomType(formData.roomType) === 'theoretical' ? (
@@ -1108,7 +1108,7 @@ function AdminCourseEditorPage() {
                     AI Theoretical Evaluation
                   </p>
                   <p className="text-sm text-on-surface-variant">
-                    No manual questions are required. The system generates different open-ended questions for each learner and evaluates technical and grammatical quality with AI. Learners must score 100 technical to complete the room.
+                    No manual questions are required. The system generates different open-ended questions for each learner and evaluates technical and grammatical quality with AI. Learners must score 100 technical to complete the skill.
                   </p>
                 </div>
               ) : Array.isArray(formData.content?.questions) && formData.content.questions.length > 0 ? (

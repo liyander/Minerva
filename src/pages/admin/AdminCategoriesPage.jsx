@@ -51,7 +51,7 @@ function AdminCategoriesPage() {
   const handleDeleteCategory = (category, roomCount) => {
     setDeleteError('')
     if (roomCount > 0) {
-      setDeleteError(`"${category}" is assigned to ${roomCount} room${roomCount === 1 ? '' : 's'}. Reassign those rooms before deleting this category.`)
+      setDeleteError(`"${category}" is assigned to ${roomCount} skill${roomCount === 1 ? '' : 's'}. Reassign those skills before deleting this category.`)
       return
     }
 
@@ -89,10 +89,10 @@ function AdminCategoriesPage() {
             </span>
           </div>
           <h1 className="font-headline text-4xl md:text-5xl font-extrabold tracking-tight">
-            Room Categories
+            Skill Categories
           </h1>
           <p className="text-sm text-on-surface-variant mt-4 max-w-2xl">
-            Add specialization categories for room filters, room creation, and proficiency tracking.
+            Add specialization categories for skill filters, skill creation, and proficiency tracking.
           </p>
         </header>
 
@@ -130,7 +130,7 @@ function AdminCategoriesPage() {
                 Available Categories
               </h2>
               <p className="text-xs text-on-surface-variant mt-1">
-                Categories assigned to rooms are locked until those rooms are reassigned.
+                Categories assigned to skills are locked until those skills are reassigned.
               </p>
             </div>
             <span className="font-headline text-xs text-primary font-bold">
@@ -157,14 +157,14 @@ function AdminCategoriesPage() {
                       {category}
                     </p>
                     <p className="text-xs text-on-surface-variant mt-1">
-                      {roomCount} room{roomCount === 1 ? '' : 's'}
+                      {roomCount} skill{roomCount === 1 ? '' : 's'}
                     </p>
                   </div>
                   <button
                     className="text-on-surface-variant hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed"
                     disabled={roomCount > 0}
                     onClick={() => handleDeleteCategory(category, roomCount)}
-                    title={roomCount > 0 ? 'Category is assigned to rooms' : 'Delete category'}
+                    title={roomCount > 0 ? 'Category is assigned to skills' : 'Delete category'}
                     type="button"
                   >
                     <span className="material-symbols-outlined">delete</span>
@@ -178,7 +178,7 @@ function AdminCategoriesPage() {
 
       <ConfirmModal
         isOpen={Boolean(categoryToDelete)}
-        message={`Delete "${categoryToDelete}" from the category list? This will not affect rooms because this category is not currently assigned.`}
+        message={`Delete "${categoryToDelete}" from the category list? This will not affect skills because this category is not currently assigned.`}
         onCancel={() => setCategoryToDelete(null)}
         onConfirm={() => void handleConfirmDelete()}
         title="Delete Category"

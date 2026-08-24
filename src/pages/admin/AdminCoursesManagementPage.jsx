@@ -67,10 +67,10 @@ function AdminCoursesManagementPage() {
             </span>
           </div>
           <h1 className="font-headline text-4xl md:text-5xl font-extrabold tracking-tight">
-            Manage Experimental Rooms
+            Manage Skills
           </h1>
           <p className="text-sm text-on-surface-variant mt-4 max-w-2xl">
-            Configure available lab rooms. Click on any room to edit title, description, content, and metadata.
+            Configure available skills. Select any skill to edit its title, description, content, and metadata.
           </p>
           <div className="mt-6">
             <button
@@ -78,7 +78,7 @@ function AdminCoursesManagementPage() {
               onClick={() => navigate('/admin/courses/new')}
               type="button"
             >
-              Add Experimental Room
+              Add Skill
             </button>
           </div>
         </header>
@@ -151,7 +151,7 @@ function AdminCoursesManagementPage() {
       <ConfirmModal
         isOpen={isModalOpen}
         title="Delete Experimental Course"
-        message="Are you sure you want to delete this lab room? This destructive move cannot be reverted and will delete associated lab content."
+        message="Are you sure you want to delete this skill? This cannot be reverted and will delete its associated learning content."
         onConfirm={handleConfirmDelete}
         onCancel={handleCancelDelete}
       />

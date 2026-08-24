@@ -39,7 +39,7 @@ export function mapRoomRow(roomRow, tags = [], keywords = []) {
       aiQuestionsEnabled: Boolean(roomRow.practical_ai_questions_enabled),
       attachment: roomRow.attachment_data
         ? {
-            name: roomRow.attachment_name || 'room-file',
+            name: roomRow.attachment_name || 'skill-file',
             type: roomRow.attachment_type || 'application/octet-stream',
             size: Number(roomRow.attachment_size || 0),
             dataUrl: roomRow.attachment_data,
