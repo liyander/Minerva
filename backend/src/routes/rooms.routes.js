@@ -398,17 +398,17 @@ async function dockerApiRequest(apiPath, { method = 'GET', body = null } = {}) {
     const transport = isHttps ? https : http
     const requestOptions = target.socketPath
       ? {
-          socketPath: target.socketPath,
-          path: apiPath,
-          method,
-        }
+        socketPath: target.socketPath,
+        path: apiPath,
+        method,
+      }
       : {
-          hostname: target.url.hostname,
-          port: target.url.port || (isHttps ? 443 : 80),
-          path: `${target.url.pathname === '/' ? '' : target.url.pathname}${apiPath}`,
-          method,
-          protocol: target.url.protocol,
-        }
+        hostname: target.url.hostname,
+        port: target.url.port || (isHttps ? 443 : 80),
+        path: `${target.url.pathname === '/' ? '' : target.url.pathname}${apiPath}`,
+        method,
+        protocol: target.url.protocol,
+      }
 
     requestOptions.headers = {
       Accept: 'application/json',
@@ -943,10 +943,10 @@ async function generateTheoreticalQuestions(room, userId, attemptSalt = '') {
     const bonusQuestion = customInterviewQuestions[0] || normalized.find((question) => question.bonus || question.sourceType === 'interview')
     const finalQuestions = bonusQuestion
       ? [
-          ...requiredQuestions,
-          ...customInterviewQuestions,
-          ...(customInterviewQuestions.length ? [] : [{ ...bonusQuestion, optional: true, bonus: true, sourceType: 'interview' }]),
-        ]
+        ...requiredQuestions,
+        ...customInterviewQuestions,
+        ...(customInterviewQuestions.length ? [] : [{ ...bonusQuestion, optional: true, bonus: true, sourceType: 'interview' }]),
+      ]
       : requiredQuestions
 
     return requiredQuestions.length >= 5
@@ -1481,15 +1481,15 @@ async function matchInterviewQuestionsToRooms(questions, rooms) {
       const match = matches.find((item) => Number(item?.questionIndex) === index && roomIds.has(String(item?.roomId)))
       return match
         ? {
-            question,
-            roomId: String(match.roomId),
-            reason: String(match.reason || 'AI matched this question to the closest room content.'),
-            company: String(match.company || 'General cybersecurity interview practice'),
-            interview: String(match.interview || 'Custom admin interview question'),
-            sourceInfo: String(match.sourceInfo || match.reason || 'Custom interview question matched by Admin AI.'),
-            rubric: String(match.rubric || 'Optional interview bonus. Award margin for clear, room-aligned reasoning.'),
-            matchedBy: 'ai',
-          }
+          question,
+          roomId: String(match.roomId),
+          reason: String(match.reason || 'AI matched this question to the closest room content.'),
+          company: String(match.company || 'General cybersecurity interview practice'),
+          interview: String(match.interview || 'Custom admin interview question'),
+          sourceInfo: String(match.sourceInfo || match.reason || 'Custom interview question matched by Admin AI.'),
+          rubric: String(match.rubric || 'Optional interview bonus. Award margin for clear, room-aligned reasoning.'),
+          matchedBy: 'ai',
+        }
         : null
     })
 
@@ -1734,11 +1734,11 @@ router.get('/profile/analysis', authenticate, async (req, res) => {
       feedback: row.feedback || '',
       questions: Array.isArray(questions)
         ? questions.map((question) => ({
-            prompt: question.prompt,
-            sourceType: question.sourceType || 'generated',
-            company: question.company || '',
-            interview: question.interview || '',
-          }))
+          prompt: question.prompt,
+          sourceType: question.sourceType || 'generated',
+          company: question.company || '',
+          interview: question.interview || '',
+        }))
         : [],
       answerPreview,
     }
@@ -1783,7 +1783,7 @@ router.put('/:id/progress', authenticate, async (req, res) => {
        ON DUPLICATE KEY UPDATE
            started_at = COALESCE(started_at, NOW()),
          completed_at = NULL`,
-        [req.user.id, room.id],
+      [req.user.id, room.id],
     )
   }
 
@@ -1845,7 +1845,7 @@ router.put('/:id/progress', authenticate, async (req, res) => {
        ON DUPLICATE KEY UPDATE
            started_at = COALESCE(started_at, NOW()),
          completed_at = VALUES(completed_at)`,
-        [req.user.id, room.id],
+      [req.user.id, room.id],
     )
 
     if (getDockerConfig(room).enabled) {
@@ -2267,13 +2267,13 @@ async function getDockerAdminStatus() {
       .flatMap((image) =>
         Array.isArray(image.RepoTags)
           ? image.RepoTags.map((tag) => ({
-              id: image.Id || image.ID || '',
-              repository: tag.split(':').slice(0, -1).join(':') || tag,
-              tag: tag.includes(':') ? tag.split(':').at(-1) : '',
-              name: tag,
-              size: image.Size ? `${Math.round(Number(image.Size) / 1024 / 1024)} MB` : '',
-              createdSince: image.Created ? new Date(Number(image.Created) * 1000).toLocaleDateString() : '',
-            }))
+            id: image.Id || image.ID || '',
+            repository: tag.split(':').slice(0, -1).join(':') || tag,
+            tag: tag.includes(':') ? tag.split(':').at(-1) : '',
+            name: tag,
+            size: image.Size ? `${Math.round(Number(image.Size) / 1024 / 1024)} MB` : '',
+            createdSince: image.Created ? new Date(Number(image.Created) * 1000).toLocaleDateString() : '',
+          }))
           : [],
       )
       .filter((image) => image.name && !image.name.includes('<none>'))
@@ -3271,7 +3271,7 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
         payload.content?.missionOverview ?? existing.content.missionOverview,
         payload.content?.remediationProtocols ?? existing.content.remediationProtocols,
         payload.content?.vulnerabilityBriefing?.definition ??
-          existing.content.vulnerabilityBriefing.definition,
+        existing.content.vulnerabilityBriefing.definition,
         payload.content?.vulnerabilityBriefing?.impact ?? existing.content.vulnerabilityBriefing.impact,
         payload.content?.technicalDeepDive ?? existing.content.technicalDeepDive,
         payload.content?.youtubeVideoUrl ?? existing.content.youtubeVideoUrl ?? null,

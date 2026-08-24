@@ -29,6 +29,8 @@ import AdminUsersPage from './pages/admin/AdminUsersPage'
 import AdminInsightsPage from './pages/admin/AdminInsightsPage'
 import AdminHomepagePage from './pages/admin/AdminHomepagePage'
 import AdminCompetencyPage from './pages/admin/AdminCompetencyPage'
+import AdminStudentMonitorPage from './pages/admin/AdminStudentMonitorPage'
+import AdminStudentStatsPage from './pages/admin/AdminStudentStatsPage'
 import TrainerWorkspacePage from './pages/trainer/TrainerWorkspacePage'
 import AssessmentEditorPage from './pages/trainer/AssessmentEditorPage'
 import AssessmentResultsPage from './pages/trainer/AssessmentResultsPage'
@@ -357,6 +359,8 @@ function App() {
           <Route path="/admin/insights" element={<AdminInsightsPage />} />
           <Route path="/admin/homepage" element={<AdminHomepagePage />} />
           <Route path="/admin/competencies" element={<AdminCompetencyPage />} />
+          <Route path="/admin/students" element={<AdminStudentMonitorPage />} />
+          <Route path="/admin/students/:userId" element={<AdminStudentStatsPage />} />
           <Route path="/trainer" element={<TrainerWorkspacePage />} />
           <Route path="/trainer/assessments/new" element={<AssessmentEditorPage />} />
           <Route path="/trainer/assessments/:assessmentId" element={<AssessmentEditorPage />} />
