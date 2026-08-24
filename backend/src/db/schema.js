@@ -277,6 +277,44 @@ export const CORE_TABLE_DDL = `
       FOREIGN KEY (career_path_id) REFERENCES career_paths(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS course_playlist_items (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      room_id VARCHAR(191) NOT NULL,
+      video_id VARCHAR(120) NULL,
+      url TEXT NOT NULL,
+      title VARCHAR(255) NOT NULL,
+      description TEXT NULL,
+      thumbnail TEXT NULL,
+      channel_title VARCHAR(255) NULL,
+      published_at VARCHAR(100) NULL,
+      source VARCHAR(50) DEFAULT 'youtube',
+      status VARCHAR(30) DEFAULT 'approved',
+      sort_order INT DEFAULT 0,
+      added_by_user_id INT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_playlist_room_status (room_id, status),
+      FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE,
+      FOREIGN KEY (added_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS student_private_recommendations (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      trainer_id INT NOT NULL,
+      student_id INT NOT NULL,
+      room_id VARCHAR(191) NULL,
+      title VARCHAR(255) NOT NULL,
+      message TEXT NOT NULL,
+      resource_url TEXT NULL,
+      is_read BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_rec_student (student_id, is_read),
+      FOREIGN KEY (trainer_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE SET NULL
+    );
+
     CREATE TABLE IF NOT EXISTS notifications (
       id INT AUTO_INCREMENT PRIMARY KEY,
       title VARCHAR(255) NOT NULL,

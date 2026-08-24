@@ -22,9 +22,13 @@ import {
   fetchRequirements,
   fetchTrainerDashboard,
 } from '../../services/platform'
+import CoursePlaylistManager from '../../components/CoursePlaylistManager'
+import PrivateSuggestionModal from '../../components/PrivateSuggestionModal'
+import { getCoursesData } from '../../data/coursesData'
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: 'space_dashboard' },
+  { id: 'playlists', label: 'Course Playlists', icon: 'playlist_play' },
   { id: 'assessments', label: 'Questionnaires', icon: 'quiz' },
   { id: 'assignments', label: 'Assignments', icon: 'assignment' },
   { id: 'library', label: 'Library', icon: 'video_library' },
@@ -101,6 +105,11 @@ function TrainerWorkspacePage() {
   })
   const [isSaving, setIsSaving] = useState(false)
 
+  const [coursesList, setCoursesList] = useState([])
+  const [selectedCourseForPlaylist, setSelectedCourseForPlaylist] = useState('')
+  const [suggestionModalStudent, setSuggestionModalStudent] = useState(null)
+  const [isSuggestionModalOpen, setIsSuggestionModalOpen] = useState(false)
+
   const [competencyForm, setCompetencyForm] = useState({
     subject: '',
     proficiency: 'Intermediate',
@@ -163,6 +172,11 @@ function TrainerWorkspacePage() {
 
   useEffect(() => {
     void loadAll()
+    const all = getCoursesData()
+    setCoursesList(all)
+    if (all.length > 0 && !selectedCourseForPlaylist) {
+      setSelectedCourseForPlaylist(all[0].id)
+    }
   }, [loadAll])
 
   useEffect(() => {
@@ -600,6 +614,43 @@ function TrainerWorkspacePage() {
           </section>
         ) : null}
 
+        {!isLoading && tab === 'playlists' ? (
+          <section className="space-y-6">
+            <div className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h2 className="font-headline text-xl font-extrabold text-on-background">
+                  Course Video & Playlist Management
+                </h2>
+                <p className="font-body text-xs text-on-surface-variant mt-1">
+                  Select a course to review auto-discovered YouTube candidates, approve videos, or add external lectures.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-bold text-on-surface-variant">Select Course:</label>
+                <select
+                  value={selectedCourseForPlaylist}
+                  onChange={(e) => setSelectedCourseForPlaylist(e.target.value)}
+                  className="text-xs font-bold px-3 py-2 rounded-xl bg-surface border border-outline-variant focus:outline-none focus:border-primary text-on-surface max-w-xs truncate"
+                >
+                  {coursesList.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {selectedCourseForPlaylist && (
+              <CoursePlaylistManager
+                roomId={selectedCourseForPlaylist}
+                courseTitle={coursesList.find((c) => c.id === selectedCourseForPlaylist)?.title}
+              />
+            )}
+          </section>
+        ) : null}
+
         {!isLoading && tab === 'assessments' ? (
           <section className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -970,7 +1021,7 @@ function TrainerWorkspacePage() {
                 <table className="w-full min-w-[36rem]">
                   <thead>
                     <tr className="text-left">
-                      {['Trainee', 'Enrolments', 'Attempts', 'Avg score', 'Certificates'].map((head) => (
+                      {['Trainee', 'Enrolments', 'Attempts', 'Avg score', 'Certificates', 'Actions'].map((head) => (
                         <th
                           className="font-headline text-xs font-bold text-on-surface-variant pb-3 px-3"
                           key={head}
@@ -1011,6 +1062,19 @@ function TrainerWorkspacePage() {
                         <td className="py-3 px-3 font-body text-sm text-on-surface">
                           {trainee.certificates}
                         </td>
+                        <td className="py-3 px-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSuggestionModalStudent(trainee)
+                              setIsSuggestionModalOpen(true)
+                            }}
+                            className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/10 text-primary hover:bg-primary/20 text-xs font-headline font-bold transition-colors"
+                          >
+                            <span className="material-symbols-outlined text-sm">edit_note</span>
+                            Suggest
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -1019,6 +1083,18 @@ function TrainerWorkspacePage() {
             )}
           </section>
         ) : null}
+
+        {/* 1-on-1 Mentorship Private Suggestion Modal */}
+        <PrivateSuggestionModal
+          isOpen={isSuggestionModalOpen}
+          student={suggestionModalStudent}
+          rooms={coursesList}
+          onClose={() => {
+            setIsSuggestionModalOpen(false)
+            setSuggestionModalStudent(null)
+          }}
+          onSent={() => setNotice('Suggestion successfully sent to student')}
+        />
       </div>
     </main>
   )

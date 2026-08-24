@@ -127,6 +127,9 @@ function CoursePage() {
   const [isTerminalOpen, setIsTerminalOpen] = useState(false)
   const [terminalLayout, setTerminalLayout] = useState('overlay')
   const [isTerminalMinimized, setIsTerminalMinimized] = useState(false)
+  const [playlistItems, setPlaylistItems] = useState([])
+  const [activeVideoIndex, setActiveVideoIndex] = useState(0)
+  const [privateSuggestions, setPrivateSuggestions] = useState([])
   const contentRootRef = useRef(null)
   const xtermHostRef = useRef(null)
   const xtermRef = useRef(null)
@@ -167,6 +170,41 @@ function CoursePage() {
     }
 
     void loadRoom()
+
+    return () => {
+      cancelled = true
+    }
+  }, [courseId])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadPlaylistAndSuggestions = async () => {
+      if (!courseId) return
+      try {
+        const [playlistRes, suggestionsRes] = await Promise.all([
+          apiFetch(`/youtube/course/${encodeURIComponent(courseId)}/playlist`).catch(() => null),
+          apiFetch(`/youtube/students/me/suggestions?roomId=${encodeURIComponent(courseId)}`).catch(() => null),
+        ])
+
+        if (!cancelled) {
+          if (Array.isArray(playlistRes?.playlist)) {
+            setPlaylistItems(playlistRes.playlist)
+            setActiveVideoIndex(0)
+          }
+          if (Array.isArray(suggestionsRes?.suggestions)) {
+            setPrivateSuggestions(suggestionsRes.suggestions)
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          setPlaylistItems([])
+          setPrivateSuggestions([])
+        }
+      }
+    }
+
+    void loadPlaylistAndSuggestions()
 
     return () => {
       cancelled = true
@@ -638,7 +676,9 @@ function CoursePage() {
   const technicalDeepDiveMarkup = renderRichContent(technicalDeepDive)
   const vulnerabilityDefinitionMarkup = renderRichContent(vulnerabilityDefinition)
   const vulnerabilityImpactMarkup = renderRichContent(vulnerabilityImpact)
-  const youtubeEmbedUrl = toYouTubeEmbedUrl(room.content?.youtubeVideoUrl)
+  const currentPlaylistItem = playlistItems[activeVideoIndex] || playlistItems[0] || null
+  const defaultVideoUrl = currentPlaylistItem?.url || room.content?.youtubeVideoUrl || ''
+  const youtubeEmbedUrl = toYouTubeEmbedUrl(defaultVideoUrl)
   const roomAttachment = room.content?.attachment
   const isAiQuestionMode = questionStatus.mode === 'theoretical' || questionStatus.mode === 'hybrid'
   const isPreparingTheoreticalQuestions =
@@ -1086,6 +1126,104 @@ function CoursePage() {
                     </>
                   )}
                 </div>
+
+                {/* TRAINER-CURATED COURSE PLAYLIST */}
+                {playlistItems.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-outline-variant/30">
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <h3 className="text-sm font-semibold uppercase tracking-wider text-on-surface-variant flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary text-lg">playlist_play</span>
+                        Course Video Playlist ({playlistItems.length})
+                      </h3>
+                      <span className="text-xs text-on-surface-variant font-medium">
+                        Playing #{activeVideoIndex + 1}: {currentPlaylistItem?.title?.slice(0, 30)}...
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {playlistItems.map((video, index) => {
+                        const isSelected = activeVideoIndex === index
+                        return (
+                          <button
+                            key={video.id || index}
+                            type="button"
+                            onClick={() => setActiveVideoIndex(index)}
+                            className={`flex gap-3 p-2.5 rounded-xl text-left transition-all border ${
+                              isSelected
+                                ? 'bg-primary/10 border-primary shadow-sm'
+                                : 'bg-surface-container-high hover:bg-surface-container-highest border-outline-variant/30'
+                            }`}
+                          >
+                            <div className="relative w-24 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-neutral-900">
+                              {video.thumbnail ? (
+                                <img
+                                  src={video.thumbnail}
+                                  alt={video.title}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <span className="material-symbols-outlined text-primary">play_circle</span>
+                                </div>
+                              )}
+                              <span className="absolute bottom-1 left-1 px-1.5 py-0.2 bg-black/80 text-white text-[10px] font-bold rounded">
+                                #{index + 1}
+                              </span>
+                            </div>
+                            <div className="flex-1 min-w-0 flex flex-col justify-center">
+                              <p className={`text-xs font-semibold line-clamp-2 leading-tight ${isSelected ? 'text-primary font-bold' : 'text-on-surface'}`}>
+                                {video.title}
+                              </p>
+                              <p className="text-[11px] text-on-surface-variant mt-1 flex items-center gap-1.5 truncate">
+                                <span>{video.channelTitle || 'Course Resource'}</span>
+                                {video.publishedAt && <span>• {video.publishedAt}</span>}
+                              </p>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* PRIVATE TRAINER GUIDANCE / SUGGESTIONS */}
+                {privateSuggestions.length > 0 && (
+                  <div className="mt-6 p-5 rounded-2xl bg-secondary/5 border border-secondary/20 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-secondary text-xl">contact_support</span>
+                      <h3 className="font-headline text-sm font-extrabold text-on-background">
+                        Trainer's Private Guidance For You
+                      </h3>
+                    </div>
+                    <div className="space-y-2.5">
+                      {privateSuggestions.map((item) => (
+                        <div
+                          key={item.id}
+                          className="p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/30"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <h4 className="text-xs font-bold text-on-background">{item.title}</h4>
+                            <span className="text-[10px] text-on-surface-variant shrink-0">
+                              By {item.trainer_first_name || item.trainer_username || 'Trainer'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">{item.message}</p>
+                          {item.resource_url && (
+                            <a
+                              href={item.resource_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1.5 text-xs font-semibold text-secondary hover:underline mt-2"
+                            >
+                              <span className="material-symbols-outlined text-sm">open_in_new</span>
+                              Watch Recommended Resource
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </section>
           </div>

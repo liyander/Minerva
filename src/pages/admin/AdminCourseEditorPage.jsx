@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { fetchRoomCategories, getRoomCategories } from '../../data/categoriesData'
 import { addCourse, getCourseById, updateCourse } from '../../data/coursesData'
 import { apiFetch } from '../../services/api'
+import CoursePlaylistManager from '../../components/CoursePlaylistManager'
 
 function slugify(value) {
   return value
@@ -419,21 +420,41 @@ function AdminCourseEditorPage() {
 
         {/* Tab Navigation */}
         <div className="flex gap-0 mb-8 border-b border-outline-variant/30">
-          {['basic', 'content', 'questions'].map((tab) => (
+          {[
+            { id: 'basic', label: 'Basic Info' },
+            { id: 'content', label: 'Content' },
+            { id: 'playlist', label: 'Videos & Playlist' },
+            { id: 'questions', label: 'Question Config' },
+          ].map((tab) => (
             <button
               className={`rounded-xl px-6 py-3 font-headline text-xs font-bold transition-all border-b-2 ${
-                activeTab === tab
+                activeTab === tab.id
                   ? 'border-primary text-primary'
                   : 'border-transparent text-on-surface-variant hover:text-on-surface'
               }`}
-              key={tab}
-              onClick={() => setActiveTab(tab)}
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
               type="button"
             >
-              {tab === 'basic' ? 'Basic Info' : tab === 'content' ? 'Content' : 'Question Config'}
+              {tab.label}
             </button>
           ))}
         </div>
+
+        {/* Video & Playlist Tab */}
+        {activeTab === 'playlist' && (
+          <div>
+            {!isNewRoom && formData.id ? (
+              <CoursePlaylistManager roomId={formData.id} courseTitle={formData.title} />
+            ) : (
+              <div className="p-8 rounded-2xl bg-surface-container-lowest text-center">
+                <p className="text-sm text-on-surface-variant font-medium">
+                  Please save the room basic info first to manage candidate videos and playlist.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Basic Information Tab */}
         {activeTab === 'basic' && (

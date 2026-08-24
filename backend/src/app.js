@@ -35,6 +35,7 @@ import cohortsRoutes from './routes/cohorts.routes.js'
 import complianceRoutes from './routes/compliance.routes.js'
 import learningRoutes from './routes/learning.routes.js'
 import reportsRoutes from './routes/reports.routes.js'
+import youtubeRoutes from './routes/youtube.routes.js'
 import publicApiRoutes from './api/publicApi.routes.js'
 
 const app = express()
@@ -128,6 +129,7 @@ app.use('/api/cohorts', cohortsRoutes)
 app.use('/api/compliance', complianceRoutes)
 app.use('/api/learning', learningRoutes)
 app.use('/api/reports', reportsRoutes)
+app.use('/api/youtube', youtubeRoutes)
 app.use('/api/public', publicApiRoutes)
 
 // Async handlers reject rather than throw synchronously; wrapping every mounted
