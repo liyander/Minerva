@@ -32,6 +32,9 @@ import AdminCompetencyPage from './pages/admin/AdminCompetencyPage'
 import TrainerWorkspacePage from './pages/trainer/TrainerWorkspacePage'
 import AssessmentEditorPage from './pages/trainer/AssessmentEditorPage'
 import AssessmentResultsPage from './pages/trainer/AssessmentResultsPage'
+import AssignmentEditorPage from './pages/trainer/AssignmentEditorPage'
+import GradingQueuePage from './pages/trainer/GradingQueuePage'
+import QuestionBankPage from './pages/trainer/QuestionBankPage'
 import AssessmentsPage from './pages/AssessmentsPage'
 import AssessmentAttemptPage from './pages/AssessmentAttemptPage'
 import TrainerLibraryPage from './pages/TrainerLibraryPage'
@@ -407,10 +410,20 @@ function App() {
               path="/trainer/assessments/:assessmentId/results"
               element={<AssessmentResultsPage />}
             />
+            <Route path="/trainer/assignments/new" element={<AssignmentEditorPage />} />
+            <Route path="/trainer/assignments/:assignmentId" element={<AssignmentEditorPage />} />
+            <Route
+              path="/trainer/assignments/:assignmentId/grading"
+              element={<GradingQueuePage />}
+            />
+            <Route path="/trainer/question-banks" element={<QuestionBankPage />} />
             <Route path="/library" element={<TrainerLibraryPage />} />
             <Route path="/assessments" element={<AssessmentsPage />} />
             <Route path="/assessments/:assessmentId" element={<AssessmentAttemptPage />} />
             <Route path="/my-profile" element={<ProfessionalProfilePage />} />
+            <Route path="/learn/paths" element={<LearningPathsPage />} />
+            <Route path="/learn/path/:pathId/module/:moduleId" element={<ModuleDetailPage />} />
+            <Route path="/learn/path/:pathId" element={<LearningPathDetailPage />} />
             <Route path="/learn" element={<CourseCatalogPage allowLabRooms={platformConfig.features.labRooms} />} />
             <Route path="/learn/course/:courseId" element={<CoursePage />} />
             <Route path="/resources" element={<ResourcesPage />} />

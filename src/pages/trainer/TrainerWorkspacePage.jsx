@@ -15,12 +15,23 @@ import {
   saveCompetency,
   updateAssessment,
 } from '../../services/training'
+import {
+  fetchAssignments,
+  fetchCohorts,
+  fetchQuestionBanks,
+  fetchRequirements,
+  fetchTrainerDashboard,
+} from '../../services/platform'
 
 const TABS = [
+  { id: 'overview', label: 'Overview', icon: 'space_dashboard' },
   { id: 'assessments', label: 'Questionnaires', icon: 'quiz' },
+  { id: 'assignments', label: 'Assignments', icon: 'assignment' },
   { id: 'library', label: 'Library', icon: 'video_library' },
   { id: 'competencies', label: 'Competencies', icon: 'workspace_premium' },
   { id: 'trainees', label: 'Trainees', icon: 'groups' },
+  { id: 'cohorts', label: 'Cohorts', icon: 'group_work' },
+  { id: 'compliance', label: 'Required training', icon: 'fact_check' },
 ]
 
 const LIBRARY_TYPES = [
@@ -56,11 +67,16 @@ function deadlineTone(deadline) {
 function TrainerWorkspacePage() {
   const navigate = useNavigate()
   const session = getAuthSession()
-  const [tab, setTab] = useState('assessments')
+  const [tab, setTab] = useState('overview')
   const [assessments, setAssessments] = useState([])
+  const [assignments, setAssignments] = useState([])
+  const [questionBanks, setQuestionBanks] = useState([])
   const [library, setLibrary] = useState([])
   const [competencies, setCompetencies] = useState([])
   const [trainees, setTrainees] = useState([])
+  const [cohorts, setCohorts] = useState([])
+  const [requirements, setRequirements] = useState([])
+  const [dashboard, setDashboard] = useState(null)
   const [subjects, setSubjects] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
@@ -90,17 +106,37 @@ function TrainerWorkspacePage() {
   const loadAll = useCallback(async () => {
     setError('')
     try {
-      const [assessmentRows, libraryRows, competencyRows, subjectRows] = await Promise.all([
+      const [
+        assessmentRows,
+        libraryRows,
+        competencyRows,
+        subjectRows,
+        assignmentRows,
+        bankRows,
+        cohortRows,
+        requirementRows,
+        dashboardRow,
+      ] = await Promise.all([
         fetchAssessments({ mine: 'true' }),
         fetchLibrary({ mine: 'true' }),
         fetchMyCompetencies(),
         fetchAssessmentSubjects(),
+        fetchAssignments({ mine: 'true' }).catch(() => []),
+        fetchQuestionBanks().catch(() => []),
+        fetchCohorts().catch(() => []),
+        fetchRequirements().catch(() => []),
+        fetchTrainerDashboard().catch(() => null),
       ])
 
       setAssessments(assessmentRows)
+      setAssignments(assignmentRows)
+      setQuestionBanks(bankRows)
       setLibrary(libraryRows)
       setCompetencies(competencyRows)
       setSubjects(subjectRows)
+      setCohorts(cohortRows)
+      setRequirements(requirementRows)
+      setDashboard(dashboardRow)
     } catch (loadError) {
       setError(loadError?.message || 'Could not load your workspace.')
     } finally {
@@ -125,8 +161,10 @@ function TrainerWorkspacePage() {
       drafts: assessments.filter((item) => !item.isPublished).length,
       attempts: assessments.reduce((sum, item) => sum + item.attemptCount, 0),
       resources: library.length,
+      assignments: assignments.length,
+      awaiting: assignments.reduce((sum, item) => sum + Number(item.pendingCount || 0), 0),
     }),
-    [assessments, library],
+    [assessments, assignments, library],
   )
 
   const handleFile = (file) => {
@@ -243,11 +281,13 @@ function TrainerWorkspacePage() {
           title={`Welcome, ${session?.firstName || session?.username || 'trainer'}`}
         />
 
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <section className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           {[
             { label: 'Published', value: stats.published, accent: 'bg-mint text-on-mint' },
             { label: 'Drafts', value: stats.drafts, accent: 'bg-butter text-on-butter' },
             { label: 'Attempts', value: stats.attempts, accent: 'bg-sky text-on-sky' },
+            { label: 'Assignments', value: stats.assignments, accent: 'bg-lavender text-on-lavender' },
+            { label: 'Awaiting grading', value: stats.awaiting, accent: 'bg-blush text-on-blush' },
             { label: 'Library items', value: stats.resources, accent: 'bg-lavender text-on-lavender' },
           ].map((tile) => (
             <div className={`rounded-2xl px-5 py-4 ${tile.accent}`} key={tile.label}>
@@ -297,6 +337,201 @@ function TrainerWorkspacePage() {
           <div className="rounded-3xl bg-surface-container-lowest p-12 text-center shadow-soft">
             <div className="mx-auto h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin"></div>
           </div>
+        ) : null}
+
+        {!isLoading && tab === 'overview' ? (
+          <div className="space-y-6">
+            <section className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="font-headline text-xl font-extrabold text-on-background">
+                    Your teaching command centre
+                  </h2>
+                  <p className="mt-1 font-body text-sm text-on-surface-variant">
+                    Everything you can create, review, publish, and monitor as a trainer.
+                  </p>
+                </div>
+                <button
+                  className={`${pill} bg-primary text-on-primary`}
+                  onClick={() => void loadAll()}
+                  type="button"
+                >
+                  Refresh workspace
+                </button>
+              </div>
+
+              <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                {[
+                  { label: 'Create assessment', detail: 'Questions, timing, attempts, and randomisation', icon: 'quiz', action: () => navigate('/trainer/assessments/new') },
+                  { label: 'Create assignment', detail: 'Written, link, code, or file work with a rubric', icon: 'assignment_add', action: () => navigate('/trainer/assignments/new') },
+                  { label: 'Question banks', detail: `${questionBanks.length} reusable banks available`, icon: 'database', action: () => navigate('/trainer/question-banks') },
+                  { label: 'Grade submissions', detail: `${stats.awaiting} submissions currently waiting`, icon: 'grading', action: () => setTab('assignments') },
+                  { label: 'Publish material', detail: 'Lectures, presentations, documents, and links', icon: 'upload_file', action: () => { setTab('library'); setUploadOpen(true) } },
+                  { label: 'Manage competencies', detail: `${competencies.length} teaching subjects declared`, icon: 'workspace_premium', action: () => setTab('competencies') },
+                  { label: 'Trainee progress', detail: 'Participation, performance, and completions', icon: 'groups', action: () => setTab('trainees') },
+                  { label: 'Cohorts', detail: `${cohorts.length} active and archived batches`, icon: 'group_work', action: () => setTab('cohorts') },
+                  { label: 'Required training', detail: `${requirements.filter((item) => item.isActive).length} active requirements`, icon: 'fact_check', action: () => setTab('compliance') },
+                  { label: 'Course catalogue', detail: 'Review available courses and activities', icon: 'school', action: () => navigate('/learn') },
+                  { label: 'Learning paths', detail: 'Review structured programmes and modules', icon: 'route', action: () => navigate('/learn/paths') },
+                  { label: 'Trainer library', detail: 'Browse all published trainer materials', icon: 'video_library', action: () => navigate('/library') },
+                  { label: 'Resources', detail: 'Open the shared research and reference library', icon: 'menu_book', action: () => navigate('/resources') },
+                  { label: 'Notes', detail: 'Keep personal and course-linked notes', icon: 'edit_note', action: () => navigate('/notes') },
+                  { label: 'Community', detail: 'Open classrooms and learning conversations', icon: 'forum', action: () => navigate('/community') },
+                  { label: 'Professional profile', detail: 'Qualifications, experience, and credentials', icon: 'badge', action: () => navigate('/my-profile') },
+                  { label: 'Public profile', detail: 'Preview your visible platform profile', icon: 'account_circle', action: () => navigate('/profile') },
+                  { label: 'Account settings', detail: 'Profile details, links, and password controls', icon: 'settings', action: () => navigate('/settings') },
+                ].map((tool) => (
+                  <button
+                    className="group rounded-2xl bg-surface-container p-4 text-left transition-colors hover:bg-surface-container-high focus:outline-none focus:ring-2 focus:ring-primary"
+                    key={tool.label}
+                    onClick={tool.action}
+                    type="button"
+                  >
+                    <span className="material-symbols-outlined rounded-xl bg-primary/10 p-2 text-primary">
+                      {tool.icon}
+                    </span>
+                    <span className="mt-3 block font-headline text-sm font-extrabold text-on-background">
+                      {tool.label}
+                    </span>
+                    <span className="mt-1 block font-body text-xs leading-5 text-on-surface-variant">
+                      {tool.detail}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <section className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="font-headline text-lg font-extrabold text-on-background">Recent learner activity</h2>
+                  <span className="rounded-full bg-sky px-3 py-1 font-headline text-xs font-bold text-on-sky">
+                    {dashboard?.recent?.length || 0} updates
+                  </span>
+                </div>
+                {dashboard?.recent?.length ? (
+                  <div className="mt-4 space-y-3">
+                    {dashboard.recent.slice(0, 6).map((activity, index) => (
+                      <div className="flex items-center gap-3 rounded-2xl bg-surface-container p-3" key={`${activity.kind}-${activity.at}-${index}`}>
+                        <span className="material-symbols-outlined text-primary">
+                          {activity.kind === 'assignment' ? 'assignment_turned_in' : 'quiz'}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-headline text-sm font-bold text-on-surface">{activity.title}</p>
+                          <p className="font-body text-xs text-on-surface-variant">
+                            {activity.who || 'Trainee'} · {formatDate(activity.at)}
+                          </p>
+                        </div>
+                        <span className="font-headline text-sm font-extrabold text-on-surface">
+                          {activity.score === null ? 'Submitted' : `${activity.score}%`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="py-8 text-center font-body text-sm text-on-surface-variant">No recent learner activity.</p>
+                )}
+              </section>
+
+              <section className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft">
+                <h2 className="font-headline text-lg font-extrabold text-on-background">Your performance</h2>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  {[
+                    ['Average assessment score', `${dashboard?.assessments?.averageScore || 0}%`],
+                    ['Passed attempts', dashboard?.assessments?.passed || 0],
+                    ['Material opens', dashboard?.library?.opens || 0],
+                    ['Trainer rating', dashboard?.feedback?.average ? `${dashboard.feedback.average}/5` : 'No ratings'],
+                  ].map(([label, value]) => (
+                    <div className="rounded-2xl bg-surface-container p-4" key={label}>
+                      <p className="font-headline text-xl font-extrabold text-on-background">{value}</p>
+                      <p className="mt-1 font-body text-xs text-on-surface-variant">{label}</p>
+                    </div>
+                  ))}
+                </div>
+                {dashboard?.subjects?.length ? (
+                  <div className="mt-4 space-y-2">
+                    {dashboard.subjects.slice(0, 5).map((subject) => (
+                      <div className="flex items-center justify-between rounded-xl bg-surface-container px-4 py-3" key={subject.subject}>
+                        <span className="font-headline text-sm font-bold text-on-surface">{subject.subject}</span>
+                        <span className="font-body text-xs text-on-surface-variant">
+                          {subject.attempts} attempts · {subject.averageScore}% average
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </section>
+            </div>
+          </div>
+        ) : null}
+
+        {!isLoading && tab === 'assignments' ? (
+          <section className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="font-headline text-lg font-extrabold text-on-background">Your assignments</h2>
+                <p className="font-body text-sm text-on-surface-variant">Create work, edit rubrics, and grade every submission.</p>
+              </div>
+              <button className={`${pill} bg-primary text-on-primary`} onClick={() => navigate('/trainer/assignments/new')} type="button">
+                New assignment
+              </button>
+            </div>
+            {assignments.length ? assignments.map((assignment) => (
+              <article className="flex flex-col gap-4 rounded-2xl bg-surface-container p-4 lg:flex-row lg:items-center" key={assignment.id}>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-headline text-base font-extrabold text-on-background">{assignment.title}</h3>
+                    <span className="rounded-full bg-secondary-container px-2.5 py-0.5 font-headline text-xs font-bold text-on-secondary-container">{assignment.subject}</span>
+                    {!assignment.isPublished ? <span className="rounded-full bg-butter px-2.5 py-0.5 font-headline text-xs font-bold text-on-butter">Draft</span> : null}
+                  </div>
+                  <p className="mt-1 font-body text-xs text-on-surface-variant">
+                    {assignment.submissionCount} submissions · {assignment.pendingCount} awaiting grading · {assignment.maxScore} marks
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button className={`${pill} bg-surface-container-high text-on-surface`} onClick={() => navigate(`/trainer/assignments/${assignment.id}`)} type="button">Edit</button>
+                  <button className={`${pill} bg-primary text-on-primary`} onClick={() => navigate(`/trainer/assignments/${assignment.id}/grading`)} type="button">Grade ({assignment.pendingCount})</button>
+                </div>
+              </article>
+            )) : <p className="py-8 text-center font-body text-sm text-on-surface-variant">No assignments yet. Create the first one.</p>}
+          </section>
+        ) : null}
+
+        {!isLoading && tab === 'cohorts' ? (
+          <section className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft">
+            <h2 className="font-headline text-lg font-extrabold text-on-background">Cohorts and batches</h2>
+            <p className="mt-1 font-body text-sm text-on-surface-variant">Cohort membership is managed by administrators; trainers can monitor every assigned group.</p>
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+              {cohorts.length ? cohorts.map((cohort) => (
+                <article className="rounded-2xl bg-surface-container p-4" key={cohort.id}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div><h3 className="font-headline text-sm font-extrabold text-on-background">{cohort.name}</h3><p className="mt-1 font-body text-xs text-on-surface-variant">{cohort.department || 'All departments'} · {cohort.memberCount} members</p></div>
+                    <span className={`rounded-full px-2.5 py-1 font-headline text-xs font-bold ${cohort.isActive ? 'bg-mint text-on-mint' : 'bg-surface-container-high text-on-surface-variant'}`}>{cohort.isActive ? 'Active' : 'Archived'}</span>
+                  </div>
+                  {cohort.description ? <p className="mt-3 font-body text-xs leading-5 text-on-surface-variant">{cohort.description}</p> : null}
+                </article>
+              )) : <p className="col-span-full py-8 text-center font-body text-sm text-on-surface-variant">No cohorts are available.</p>}
+            </div>
+          </section>
+        ) : null}
+
+        {!isLoading && tab === 'compliance' ? (
+          <section className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft">
+            <h2 className="font-headline text-lg font-extrabold text-on-background">Required training</h2>
+            <p className="mt-1 font-body text-sm text-on-surface-variant">Review active requirements, audiences, targets, and deadlines.</p>
+            <div className="mt-4 space-y-3">
+              {requirements.length ? requirements.map((requirement) => (
+                <article className="flex flex-col gap-3 rounded-2xl bg-surface-container p-4 sm:flex-row sm:items-center" key={requirement.id}>
+                  <span className="material-symbols-outlined text-primary">fact_check</span>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-headline text-sm font-extrabold text-on-background">{requirement.title}</h3>
+                    <p className="mt-1 font-body text-xs text-on-surface-variant">{requirement.target} · {requirement.cohortName || requirement.department || (requirement.appliesToAll ? 'Everyone' : 'No audience')}</p>
+                  </div>
+                  <div className="text-left sm:text-right"><p className="font-headline text-xs font-bold text-on-surface">{requirement.dueOn ? formatDate(requirement.dueOn) : 'No due date'}</p><p className="font-body text-xs text-on-surface-variant">{requirement.isActive ? 'Active' : 'Inactive'}</p></div>
+                </article>
+              )) : <p className="py-8 text-center font-body text-sm text-on-surface-variant">No required training has been configured.</p>}
+            </div>
+          </section>
         ) : null}
 
         {!isLoading && tab === 'assessments' ? (

@@ -71,9 +71,12 @@ function Sidebar({ config, isSidebarOpen, onClose }) {
   const navItems = (isTrainer
         ? [
             { to: '/trainer', icon: 'space_dashboard', label: 'Workspace', end: true },
+            { to: '/trainer/assignments/new', icon: 'assignment_add', label: 'New assignment' },
+            { to: '/trainer/question-banks', icon: 'quiz', label: 'Question banks' },
             { to: '/assessments', icon: 'quiz', label: 'Assessments' },
             { to: '/library', icon: 'video_library', label: 'Library' },
             config.routes.practiceLabs && { to: '/learn', icon: 'school', label: 'Courses' },
+            config.routes.learningPaths && { to: '/learn/paths', icon: 'route', label: 'Learning paths' },
             { to: '/resources', icon: 'menu_book', label: 'Resources' },
             { to: '/notes', icon: 'edit_note', label: 'Notes' },
             { to: '/community', icon: 'forum', label: 'Community' },
