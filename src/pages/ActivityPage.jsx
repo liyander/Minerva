@@ -75,7 +75,7 @@ const ActivityPage = () => {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 w-full animate-fade-in">
+    <div className="mt-16 md:mt-20 p-4 sm:p-6 lg:p-8 w-full animate-fade-in">
       <div className="mb-8 flex items-center gap-4">
         <div className="w-14 h-14 bg-emerald-500/10 rounded-2xl flex items-center justify-center shrink-0">
           <span className="material-symbols-outlined text-3xl text-emerald-500">local_fire_department</span>
