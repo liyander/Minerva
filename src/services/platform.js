@@ -63,6 +63,7 @@ export const copyBankToAssessment = (bankId, assessmentId) =>
 
 /* --------------------------------------------------------------- cohorts --- */
 export const fetchCohorts = () => apiFetch('/cohorts')
+export const fetchMyLearningContext = () => apiFetch('/cohorts/me')
 export const createCohort = (payload) => apiFetch('/cohorts', { method: 'POST', ...json(payload) })
 export const updateCohort = (id, payload) =>
   apiFetch(`/cohorts/${id}`, { method: 'PUT', ...json(payload) })

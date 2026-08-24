@@ -211,6 +211,15 @@ function CourseCatalogPage({ allowLabRooms = true, selectedLabId = null }) {
             {course.description}
           </p>
 
+          {course.trainerName ? (
+            <div className="mb-4 flex items-center gap-2 rounded-xl bg-surface-container px-3 py-2">
+              <span className="material-symbols-outlined text-base text-primary">co_present</span>
+              <span className="font-body text-xs text-on-surface-variant">
+                Trainer <strong className="font-headline text-on-surface">{course.trainerName}</strong>
+              </span>
+            </div>
+          ) : null}
+
           <div className="flex flex-wrap items-center gap-4 text-xs font-body text-on-surface-variant mb-6">
             {course.estimateTime ? (
               <span className="flex items-center gap-1.5">

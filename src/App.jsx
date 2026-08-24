@@ -37,6 +37,8 @@ import GradingQueuePage from './pages/trainer/GradingQueuePage'
 import QuestionBankPage from './pages/trainer/QuestionBankPage'
 import AssessmentsPage from './pages/AssessmentsPage'
 import AssessmentAttemptPage from './pages/AssessmentAttemptPage'
+import AssignmentsPage from './pages/AssignmentsPage'
+import AssignmentDetailPage from './pages/AssignmentDetailPage'
 import TrainerLibraryPage from './pages/TrainerLibraryPage'
 import ProfessionalProfilePage from './pages/ProfessionalProfilePage'
 import AdminInterviewQuestionsPage from './pages/admin/AdminInterviewQuestionsPage'
@@ -589,6 +591,8 @@ function App() {
           <Route path="/community" element={<CommunityPage />} />
           <Route path="/assessments" element={<AssessmentsPage />} />
           <Route path="/assessments/:assessmentId" element={<AssessmentAttemptPage />} />
+          <Route path="/assignments" element={<AssignmentsPage />} />
+          <Route path="/assignments/:assignmentId" element={<AssignmentDetailPage />} />
           <Route path="/library" element={<TrainerLibraryPage />} />
           <Route path="/my-profile" element={<ProfessionalProfilePage />} />
           <Route

@@ -1334,7 +1334,15 @@ function parseCustomInterviewQuestions(room) {
 }
 
 async function fetchRoomById(id) {
-  const [roomRows] = await pool.query('SELECT * FROM rooms WHERE id = ? OR slug = ? LIMIT 1', [id, id])
+  const [roomRows] = await pool.query(
+    `SELECT r.*, u.username AS trainer_username, u.first_name AS trainer_first_name,
+            u.last_name AS trainer_last_name
+     FROM rooms r
+     LEFT JOIN users u ON u.id = r.trainer_id
+     WHERE r.id = ? OR r.slug = ?
+     LIMIT 1`,
+    [id, id],
+  )
   if (!roomRows.length) {
     return null
   }
@@ -1379,7 +1387,13 @@ function buildRoomId(input) {
 }
 
 router.get('/', optionalAuthenticate, async (req, res) => {
-  const [rows] = await pool.query('SELECT * FROM rooms ORDER BY created_at DESC')
+  const [rows] = await pool.query(
+    `SELECT r.*, u.username AS trainer_username, u.first_name AS trainer_first_name,
+            u.last_name AS trainer_last_name
+     FROM rooms r
+     LEFT JOIN users u ON u.id = r.trainer_id
+     ORDER BY r.created_at DESC`,
+  )
   const rooms = []
 
   for (const room of rows) {

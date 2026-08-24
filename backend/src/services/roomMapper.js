@@ -12,6 +12,11 @@ export function mapRoomRow(roomRow, tags = [], keywords = []) {
     dotTone: roomRow.dot_tone,
     title: roomRow.title,
     description: roomRow.description,
+    trainerId: roomRow.trainer_id || null,
+    trainerName:
+      [roomRow.trainer_first_name, roomRow.trainer_last_name].filter(Boolean).join(' ')
+      || roomRow.trainer_username
+      || null,
     xp: roomRow.xp,
     roomType,
     difficulty: roomRow.difficulty,

@@ -859,7 +859,7 @@ async function attachAssignmentAttachments(assignments) {
   const placeholders = ids.map(() => '?').join(',')
   const [rows] = await pool.query(
     `SELECT id, assignment_id, file_name, file_type, file_size, external_url, created_at
-     FROM assignment_attachments WHERE assignment_id IN (${placeholders})`,
+     FROM classroom_assignment_attachments WHERE assignment_id IN (${placeholders})`,
     ids,
   )
   const byAssignment = new Map()
@@ -887,7 +887,7 @@ router.get('/assignments', authenticate, async (req, res) => {
   if (!(await ensureClassroomMember(req, res, classroomId))) return
 
   const [rows] = await pool.query(
-    'SELECT * FROM assignments WHERE classroom_id = ? ORDER BY (due_at IS NULL), due_at ASC, created_at DESC',
+    'SELECT * FROM classroom_assignments WHERE classroom_id = ? ORDER BY (due_at IS NULL), due_at ASC, created_at DESC',
     [classroomId],
   )
   const assignments = await attachAssignmentAttachments(rows.map(mapAssignmentRow))
@@ -899,7 +899,7 @@ router.get('/assignments', authenticate, async (req, res) => {
     const ids = assignments.map((assignment) => assignment.id)
     if (ids.length) {
       const [submissionCounts] = await pool.query(
-        `SELECT assignment_id, COUNT(*) AS count FROM assignment_submissions
+        `SELECT assignment_id, COUNT(*) AS count FROM classroom_assignment_submissions
          WHERE assignment_id IN (${ids.map(() => '?').join(',')}) GROUP BY assignment_id`,
         ids,
       )
@@ -911,7 +911,7 @@ router.get('/assignments', authenticate, async (req, res) => {
     }
   } else {
     const [ownSubmissions] = await pool.query(
-      'SELECT assignment_id, status, grade FROM assignment_submissions WHERE student_id = ? AND assignment_id IN (' +
+      'SELECT assignment_id, status, grade FROM classroom_assignment_submissions WHERE student_id = ? AND assignment_id IN (' +
         `${assignments.map(() => '?').join(',') || 'NULL'})`,
       [req.user.id, ...assignments.map((assignment) => assignment.id)],
     )
@@ -934,7 +934,7 @@ router.post('/assignments', authenticate, requireTrainer, async (req, res) => {
   if (!title) return res.status(400).json({ message: 'Title is required.' })
 
   const [result] = await pool.query(
-    `INSERT INTO assignments
+    `INSERT INTO classroom_assignments
        (classroom_id, title, description, instructions, due_at, max_marks, submission_type, created_by)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
@@ -952,7 +952,7 @@ router.post('/assignments', authenticate, requireTrainer, async (req, res) => {
   const attachments = Array.isArray(req.body?.attachments) ? req.body.attachments : []
   for (const attachment of attachments.slice(0, 10)) {
     await pool.query(
-      `INSERT INTO assignment_attachments (assignment_id, file_name, file_type, file_size, file_data, external_url)
+      `INSERT INTO classroom_assignment_attachments (assignment_id, file_name, file_type, file_size, file_data, external_url)
        VALUES (?, ?, ?, ?, ?, ?)`,
       [
         result.insertId,
@@ -965,13 +965,13 @@ router.post('/assignments', authenticate, requireTrainer, async (req, res) => {
     )
   }
 
-  const [rows] = await pool.query('SELECT * FROM assignments WHERE id = ?', [result.insertId])
+  const [rows] = await pool.query('SELECT * FROM classroom_assignments WHERE id = ?', [result.insertId])
   const [assignment] = await attachAssignmentAttachments(rows.map(mapAssignmentRow))
   return res.status(201).json(assignment)
 })
 
 async function fetchAssignmentForRequest(req, res, assignmentId) {
-  const [rows] = await pool.query('SELECT * FROM assignments WHERE id = ?', [assignmentId])
+  const [rows] = await pool.query('SELECT * FROM classroom_assignments WHERE id = ?', [assignmentId])
   if (!rows.length) {
     res.status(404).json({ message: 'Assignment not found.' })
     return null
@@ -991,7 +991,7 @@ router.get('/assignments/:id', authenticate, async (req, res) => {
   if (isTeacher) {
     const [submissionRows] = await pool.query(
       `SELECT s.*, u.username, u.first_name, u.last_name
-       FROM assignment_submissions s JOIN users u ON u.id = s.student_id
+       FROM classroom_assignment_submissions s JOIN users u ON u.id = s.student_id
        WHERE s.assignment_id = ? ORDER BY s.submitted_at DESC`,
       [assignmentRow.id],
     )
@@ -999,7 +999,7 @@ router.get('/assignments/:id', authenticate, async (req, res) => {
   }
 
   const [ownRows] = await pool.query(
-    'SELECT * FROM assignment_submissions WHERE assignment_id = ? AND student_id = ?',
+    'SELECT * FROM classroom_assignment_submissions WHERE assignment_id = ? AND student_id = ?',
     [assignmentRow.id, req.user.id],
   )
   return res.json({ ...assignment, mySubmission: ownRows[0] ? mapSubmissionRow(ownRows[0]) : null })
@@ -1032,8 +1032,8 @@ router.patch('/assignments/:id', authenticate, requireTrainer, async (req, res) 
   if (!fields.length) return res.status(400).json({ message: 'Nothing to update.' })
 
   params.push(assignmentRow.id)
-  await pool.query(`UPDATE assignments SET ${fields.join(', ')} WHERE id = ?`, params)
-  const [rows] = await pool.query('SELECT * FROM assignments WHERE id = ?', [assignmentRow.id])
+  await pool.query(`UPDATE classroom_assignments SET ${fields.join(', ')} WHERE id = ?`, params)
+  const [rows] = await pool.query('SELECT * FROM classroom_assignments WHERE id = ?', [assignmentRow.id])
   const [assignment] = await attachAssignmentAttachments(rows.map(mapAssignmentRow))
   return res.json(assignment)
 })
@@ -1043,7 +1043,7 @@ router.delete('/assignments/:id', authenticate, requireTrainer, async (req, res)
   if (!assignmentRow) return
   if (!(await ensureClassroomTeacher(req, res, assignmentRow.classroom_id))) return
 
-  await pool.query('DELETE FROM assignments WHERE id = ?', [assignmentRow.id])
+  await pool.query('DELETE FROM classroom_assignments WHERE id = ?', [assignmentRow.id])
   return res.status(204).send()
 })
 
@@ -1091,7 +1091,7 @@ router.post('/assignments/:id/submissions', authenticate, async (req, res) => {
   const status = assignmentRow.due_at && new Date() > new Date(assignmentRow.due_at) ? 'late' : 'submitted'
 
   await pool.query(
-    `INSERT INTO assignment_submissions
+    `INSERT INTO classroom_assignment_submissions
        (assignment_id, student_id, body, link_url, file_name, file_type, file_size, file_data, status, submitted_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
      ON DUPLICATE KEY UPDATE
@@ -1113,18 +1113,18 @@ router.post('/assignments/:id/submissions', authenticate, async (req, res) => {
   )
 
   const [rows] = await pool.query(
-    'SELECT * FROM assignment_submissions WHERE assignment_id = ? AND student_id = ?',
+    'SELECT * FROM classroom_assignment_submissions WHERE assignment_id = ? AND student_id = ?',
     [assignmentRow.id, req.user.id],
   )
   return res.status(201).json(mapSubmissionRow(rows[0]))
 })
 
 router.patch('/submissions/:id', authenticate, requireTrainer, async (req, res) => {
-  const [rows] = await pool.query('SELECT * FROM assignment_submissions WHERE id = ?', [req.params.id])
+  const [rows] = await pool.query('SELECT * FROM classroom_assignment_submissions WHERE id = ?', [req.params.id])
   if (!rows.length) return res.status(404).json({ message: 'Submission not found.' })
   const submission = rows[0]
 
-  const [assignmentRows] = await pool.query('SELECT * FROM assignments WHERE id = ?', [submission.assignment_id])
+  const [assignmentRows] = await pool.query('SELECT * FROM classroom_assignments WHERE id = ?', [submission.assignment_id])
   const assignment = assignmentRows[0]
   if (!(await ensureClassroomTeacher(req, res, assignment.classroom_id))) return
 
@@ -1145,9 +1145,9 @@ router.patch('/submissions/:id', authenticate, requireTrainer, async (req, res) 
   params.push(status)
 
   params.push(submission.id)
-  await pool.query(`UPDATE assignment_submissions SET ${fields.join(', ')} WHERE id = ?`, params)
+  await pool.query(`UPDATE classroom_assignment_submissions SET ${fields.join(', ')} WHERE id = ?`, params)
 
-  const [updatedRows] = await pool.query('SELECT * FROM assignment_submissions WHERE id = ?', [submission.id])
+  const [updatedRows] = await pool.query('SELECT * FROM classroom_assignment_submissions WHERE id = ?', [submission.id])
   return res.json(mapSubmissionRow(updatedRows[0]))
 })
 

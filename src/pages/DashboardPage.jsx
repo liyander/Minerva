@@ -6,6 +6,8 @@ import HomepageFeed from '../components/HomepageFeed'
 import MiniCalendar from '../components/MiniCalendar'
 import { EVENT_KINDS } from '../components/calendarEventKinds'
 import ProgressDonut from '../components/ProgressDonut'
+import RequiredTrainingPanel from '../components/RequiredTrainingPanel'
+import TraineeLearningContextPanel from '../components/TraineeLearningContextPanel'
 import { getCoursesData } from '../data/coursesData'
 import { apiFetch } from '../services/api'
 import { getCareerPathsData, hydrateCareerPathsData } from '../data/careerPathsData'
@@ -575,6 +577,11 @@ function DashboardPage() {
             </p>
           </section>
         ) : null}
+
+        <div className="mt-7 space-y-7">
+          <RequiredTrainingPanel />
+          <TraineeLearningContextPanel />
+        </div>
 
         <div className="mt-7 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_20rem] gap-6">
           <div className="min-w-0 space-y-7">

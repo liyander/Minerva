@@ -7,6 +7,13 @@ import {
   defaultRooms,
   defaultCareerPaths,
 } from '../seed/defaultData.js'
+import {
+  applyColumnMigrations,
+  createCoreTables,
+  createDatabaseIfMissing,
+  getTableStatus,
+} from './schema.js'
+import { seedStarterData } from './seeder.js'
 
 export const pool = mysql.createPool({
   host: env.db.host,
@@ -30,6 +37,37 @@ export async function testConnection() {
 }
 
 export async function initializeDatabaseIfNeeded() {
+  const conn = await mysql.createConnection({
+    host: env.db.host,
+    port: env.db.port,
+    user: env.db.user,
+    password: env.db.password,
+    multipleStatements: true,
+  })
+
+  try {
+    await createDatabaseIfMissing(conn)
+    await createCoreTables(conn)
+    const addedColumns = await applyColumnMigrations(conn)
+    await seedStarterData(conn)
+
+    const status = await getTableStatus(conn)
+    const missing = status.filter((table) => !table.exists).map((table) => table.name)
+    if (missing.length) {
+      throw new Error(`Database migration incomplete; missing tables: ${missing.join(', ')}`)
+    }
+
+    console.log(
+      `✓ Database schema ready (${status.length} tables, ${addedColumns.length} columns added)`,
+    )
+  } finally {
+    await conn.end()
+  }
+}
+
+// Retained temporarily for compatibility while deployments move to the
+// centralized, incremental schema initializer above.
+export async function initializeDatabaseLegacyIfNeeded() {
   const conn = await mysql.createConnection({
     host: env.db.host,
     port: env.db.port,

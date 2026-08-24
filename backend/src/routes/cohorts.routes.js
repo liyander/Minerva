@@ -37,6 +37,55 @@ router.get('/', requireTrainer, async (_req, res) => {
   )
 })
 
+/** The signed-in trainee's batches and learning assigned through enrolment. */
+router.get('/me', async (req, res) => {
+  const [cohortRows] = await pool.query(
+    `SELECT c.id, c.name, c.code, c.description, c.department, c.starts_on, c.ends_on,
+            c.is_active, m.member_role
+     FROM cohort_members m
+     JOIN cohorts c ON c.id = m.cohort_id
+     WHERE m.user_id = ?
+     ORDER BY c.is_active DESC, c.starts_on DESC, c.name ASC`,
+    [req.user.id],
+  )
+
+  const [enrolmentRows] = await pool.query(
+    `SELECT e.id, e.status, e.enrolled_at, e.completed_at, e.room_id, e.career_path_id,
+            r.title AS course_title, r.slug AS course_slug, p.title AS path_title
+     FROM course_enrollments e
+     LEFT JOIN rooms r ON r.id = e.room_id
+     LEFT JOIN career_paths p ON p.id = e.career_path_id
+     WHERE e.user_id = ?
+     ORDER BY e.status = 'active' DESC, e.enrolled_at DESC`,
+    [req.user.id],
+  )
+
+  return res.json({
+    cohorts: cohortRows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      code: row.code,
+      description: row.description,
+      department: row.department,
+      startsOn: row.starts_on,
+      endsOn: row.ends_on,
+      isActive: Boolean(row.is_active),
+      memberRole: row.member_role,
+    })),
+    enrolments: enrolmentRows.map((row) => ({
+      id: row.id,
+      status: row.status,
+      enrolledAt: row.enrolled_at,
+      completedAt: row.completed_at,
+      kind: row.room_id ? 'course' : 'path',
+      title: row.course_title || row.path_title || 'Assigned learning',
+      link: row.room_id
+        ? `/learn/course/${row.course_slug || row.room_id}`
+        : `/learn/path/${row.career_path_id}`,
+    })),
+  })
+})
+
 router.post('/', requireAdmin, async (req, res) => {
   const name = String(req.body?.name || '').trim()
   if (!name) return res.status(400).json({ message: 'Name is required' })

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import PageHeader from '../../components/PageHeader'
 import { getAuthSession } from '../../auth'
 import {
@@ -32,6 +32,7 @@ const TABS = [
   { id: 'trainees', label: 'Trainees', icon: 'groups' },
   { id: 'cohorts', label: 'Cohorts', icon: 'group_work' },
   { id: 'compliance', label: 'Required training', icon: 'fact_check' },
+  { id: 'reports', label: 'Reports', icon: 'analytics' },
 ]
 
 const LIBRARY_TYPES = [
@@ -66,8 +67,12 @@ function deadlineTone(deadline) {
 
 function TrainerWorkspacePage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const session = getAuthSession()
-  const [tab, setTab] = useState('overview')
+  const requestedTab = searchParams.get('tab')
+  const [tab, setTab] = useState(
+    TABS.some((item) => item.id === requestedTab) ? requestedTab : 'overview',
+  )
   const [assessments, setAssessments] = useState([])
   const [assignments, setAssignments] = useState([])
   const [questionBanks, setQuestionBanks] = useState([])
@@ -102,6 +107,18 @@ function TrainerWorkspacePage() {
     proficiencyScore: 3,
     yearsExperience: 0,
   })
+
+  const selectTab = useCallback((nextTab, extra = {}) => {
+    setTab(nextTab)
+    const params = nextTab === 'overview' ? {} : { tab: nextTab, ...extra }
+    setSearchParams(params, { replace: true })
+  }, [setSearchParams])
+
+  useEffect(() => {
+    const nextTab = searchParams.get('tab') || 'overview'
+    if (TABS.some((item) => item.id === nextTab)) setTab(nextTab)
+    if (nextTab === 'library' && searchParams.get('upload') === '1') setUploadOpen(true)
+  }, [searchParams])
 
   const loadAll = useCallback(async () => {
     setError('')
@@ -166,6 +183,10 @@ function TrainerWorkspacePage() {
     }),
     [assessments, assignments, library],
   )
+  const gradingOnly = searchParams.get('focus') === 'grading'
+  const visibleAssignments = gradingOnly
+    ? assignments.filter((assignment) => Number(assignment.pendingCount || 0) > 0)
+    : assignments
 
   const handleFile = (file) => {
     if (!file) return
@@ -306,7 +327,7 @@ function TrainerWorkspacePage() {
                   : 'bg-surface-container-lowest text-on-surface-variant hover:text-on-surface'
               }`}
               key={item.id}
-              onClick={() => setTab(item.id)}
+              onClick={() => selectTab(item.id)}
               type="button"
             >
               <span className="material-symbols-outlined text-base">{item.icon}</span>
@@ -365,12 +386,12 @@ function TrainerWorkspacePage() {
                   { label: 'Create assessment', detail: 'Questions, timing, attempts, and randomisation', icon: 'quiz', action: () => navigate('/trainer/assessments/new') },
                   { label: 'Create assignment', detail: 'Written, link, code, or file work with a rubric', icon: 'assignment_add', action: () => navigate('/trainer/assignments/new') },
                   { label: 'Question banks', detail: `${questionBanks.length} reusable banks available`, icon: 'database', action: () => navigate('/trainer/question-banks') },
-                  { label: 'Grade submissions', detail: `${stats.awaiting} submissions currently waiting`, icon: 'grading', action: () => setTab('assignments') },
-                  { label: 'Publish material', detail: 'Lectures, presentations, documents, and links', icon: 'upload_file', action: () => { setTab('library'); setUploadOpen(true) } },
-                  { label: 'Manage competencies', detail: `${competencies.length} teaching subjects declared`, icon: 'workspace_premium', action: () => setTab('competencies') },
-                  { label: 'Trainee progress', detail: 'Participation, performance, and completions', icon: 'groups', action: () => setTab('trainees') },
-                  { label: 'Cohorts', detail: `${cohorts.length} active and archived batches`, icon: 'group_work', action: () => setTab('cohorts') },
-                  { label: 'Required training', detail: `${requirements.filter((item) => item.isActive).length} active requirements`, icon: 'fact_check', action: () => setTab('compliance') },
+                  { label: 'Grade submissions', detail: `${stats.awaiting} submissions currently waiting`, icon: 'grading', action: () => selectTab('assignments', { focus: 'grading' }) },
+                  { label: 'Publish material', detail: 'Lectures, presentations, documents, and links', icon: 'upload_file', action: () => { selectTab('library', { upload: '1' }); setUploadOpen(true) } },
+                  { label: 'Manage competencies', detail: `${competencies.length} teaching subjects declared`, icon: 'workspace_premium', action: () => selectTab('competencies') },
+                  { label: 'Trainee progress', detail: 'Participation, performance, and completions', icon: 'groups', action: () => selectTab('trainees') },
+                  { label: 'Cohorts', detail: `${cohorts.length} active and archived batches`, icon: 'group_work', action: () => selectTab('cohorts') },
+                  { label: 'Required training', detail: `${requirements.filter((item) => item.isActive).length} active requirements`, icon: 'fact_check', action: () => selectTab('compliance') },
                   { label: 'Course catalogue', detail: 'Review available courses and activities', icon: 'school', action: () => navigate('/learn') },
                   { label: 'Learning paths', detail: 'Review structured programmes and modules', icon: 'route', action: () => navigate('/learn/paths') },
                   { label: 'Trainer library', detail: 'Browse all published trainer materials', icon: 'video_library', action: () => navigate('/library') },
@@ -469,14 +490,14 @@ function TrainerWorkspacePage() {
           <section className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="font-headline text-lg font-extrabold text-on-background">Your assignments</h2>
-                <p className="font-body text-sm text-on-surface-variant">Create work, edit rubrics, and grade every submission.</p>
+                <h2 className="font-headline text-lg font-extrabold text-on-background">{gradingOnly ? 'Grading queue' : 'Your assignments'}</h2>
+                <p className="font-body text-sm text-on-surface-variant">{gradingOnly ? 'Assignments with submissions waiting for your review.' : 'Create work, edit rubrics, and grade every submission.'}</p>
               </div>
               <button className={`${pill} bg-primary text-on-primary`} onClick={() => navigate('/trainer/assignments/new')} type="button">
                 New assignment
               </button>
             </div>
-            {assignments.length ? assignments.map((assignment) => (
+            {visibleAssignments.length ? visibleAssignments.map((assignment) => (
               <article className="flex flex-col gap-4 rounded-2xl bg-surface-container p-4 lg:flex-row lg:items-center" key={assignment.id}>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
@@ -493,7 +514,7 @@ function TrainerWorkspacePage() {
                   <button className={`${pill} bg-primary text-on-primary`} onClick={() => navigate(`/trainer/assignments/${assignment.id}/grading`)} type="button">Grade ({assignment.pendingCount})</button>
                 </div>
               </article>
-            )) : <p className="py-8 text-center font-body text-sm text-on-surface-variant">No assignments yet. Create the first one.</p>}
+            )) : <p className="py-8 text-center font-body text-sm text-on-surface-variant">{gradingOnly ? 'Your grading queue is clear.' : 'No assignments yet. Create the first one.'}</p>}
           </section>
         ) : null}
 
@@ -530,6 +551,51 @@ function TrainerWorkspacePage() {
                   <div className="text-left sm:text-right"><p className="font-headline text-xs font-bold text-on-surface">{requirement.dueOn ? formatDate(requirement.dueOn) : 'No due date'}</p><p className="font-body text-xs text-on-surface-variant">{requirement.isActive ? 'Active' : 'Inactive'}</p></div>
                 </article>
               )) : <p className="py-8 text-center font-body text-sm text-on-surface-variant">No required training has been configured.</p>}
+            </div>
+          </section>
+        ) : null}
+
+        {!isLoading && tab === 'reports' ? (
+          <section className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft space-y-6">
+            <div>
+              <h2 className="font-headline text-lg font-extrabold text-on-background">Trainer reports</h2>
+              <p className="mt-1 font-body text-sm text-on-surface-variant">Performance data is limited to content and learners connected to your teaching activity.</p>
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {[
+                ['Assessment attempts', dashboard?.assessments?.attempts || 0, 'quiz'],
+                ['Average score', `${dashboard?.assessments?.averageScore || 0}%`, 'monitoring'],
+                ['Assignment submissions', dashboard?.assignments?.submissions || 0, 'assignment_turned_in'],
+                ['Awaiting grading', dashboard?.assignments?.awaiting || 0, 'grading'],
+                ['Published assessments', dashboard?.assessments?.published || 0, 'publish'],
+                ['Library opens', dashboard?.library?.opens || 0, 'visibility'],
+                ['Feedback responses', dashboard?.feedback?.count || 0, 'reviews'],
+                ['Trainer rating', dashboard?.feedback?.average ? `${dashboard.feedback.average}/5` : 'No ratings', 'star'],
+              ].map(([label, value, icon]) => (
+                <article className="rounded-2xl bg-surface-container p-4" key={label}>
+                  <span className="material-symbols-outlined text-primary">{icon}</span>
+                  <p className="mt-3 font-headline text-2xl font-extrabold text-on-background">{value}</p>
+                  <p className="mt-1 font-body text-xs text-on-surface-variant">{label}</p>
+                </article>
+              ))}
+            </div>
+            <div>
+              <h3 className="font-headline text-base font-extrabold text-on-background">Results by subject</h3>
+              {dashboard?.subjects?.length ? (
+                <div className="mt-3 overflow-x-auto">
+                  <table className="w-full min-w-[34rem]">
+                    <thead><tr>{['Subject', 'Assessments', 'Attempts', 'Average score'].map((heading) => <th className="px-3 pb-3 text-left font-headline text-xs font-bold text-on-surface-variant" key={heading}>{heading}</th>)}</tr></thead>
+                    <tbody>{dashboard.subjects.map((subject) => (
+                      <tr className="border-t border-outline-variant" key={subject.subject}>
+                        <td className="px-3 py-3 font-headline text-sm font-bold text-on-surface">{subject.subject}</td>
+                        <td className="px-3 py-3 font-body text-sm text-on-surface">{subject.assessments}</td>
+                        <td className="px-3 py-3 font-body text-sm text-on-surface">{subject.attempts}</td>
+                        <td className="px-3 py-3 font-headline text-sm font-bold text-on-surface">{subject.averageScore}%</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              ) : <p className="py-8 text-center font-body text-sm text-on-surface-variant">No report data is available yet.</p>}
             </div>
           </section>
         ) : null}

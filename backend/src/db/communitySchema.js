@@ -110,7 +110,7 @@ export const COMMUNITY_TABLE_DDL = `
     FOREIGN KEY (parent_comment_id) REFERENCES discussion_comments(id) ON DELETE CASCADE
   );
 
-  CREATE TABLE IF NOT EXISTS assignments (
+  CREATE TABLE IF NOT EXISTS classroom_assignments (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     classroom_id BIGINT NOT NULL,
     title VARCHAR(255) NOT NULL,
@@ -127,7 +127,7 @@ export const COMMUNITY_TABLE_DDL = `
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
   );
 
-  CREATE TABLE IF NOT EXISTS assignment_attachments (
+  CREATE TABLE IF NOT EXISTS classroom_assignment_attachments (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     assignment_id BIGINT NOT NULL,
     file_name VARCHAR(255),
@@ -137,10 +137,10 @@ export const COMMUNITY_TABLE_DDL = `
     external_url TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_attachment_assignment (assignment_id),
-    FOREIGN KEY (assignment_id) REFERENCES assignments(id) ON DELETE CASCADE
+    FOREIGN KEY (assignment_id) REFERENCES classroom_assignments(id) ON DELETE CASCADE
   );
 
-  CREATE TABLE IF NOT EXISTS assignment_submissions (
+  CREATE TABLE IF NOT EXISTS classroom_assignment_submissions (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     assignment_id BIGINT NOT NULL,
     student_id INT NOT NULL,
@@ -157,7 +157,7 @@ export const COMMUNITY_TABLE_DDL = `
     graded_by INT NULL,
     graded_at DATETIME NULL,
     UNIQUE KEY uniq_submission (assignment_id, student_id),
-    FOREIGN KEY (assignment_id) REFERENCES assignments(id) ON DELETE CASCADE,
+    FOREIGN KEY (assignment_id) REFERENCES classroom_assignments(id) ON DELETE CASCADE,
     FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (graded_by) REFERENCES users(id) ON DELETE SET NULL
   );
@@ -173,7 +173,7 @@ export const COMMUNITY_TABLES = [
   'discussion_issues',
   'discussion_issue_labels',
   'discussion_comments',
-  'assignments',
-  'assignment_attachments',
-  'assignment_submissions',
+  'classroom_assignments',
+  'classroom_assignment_attachments',
+  'classroom_assignment_submissions',
 ]

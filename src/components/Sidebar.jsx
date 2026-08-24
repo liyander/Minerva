@@ -70,17 +70,24 @@ function Sidebar({ config, isSidebarOpen, onClose }) {
 
   const navItems = (isTrainer
         ? [
-            { to: '/trainer', icon: 'space_dashboard', label: 'Workspace', end: true },
-            { to: '/trainer/assignments/new', icon: 'assignment_add', label: 'New assignment' },
-            { to: '/trainer/question-banks', icon: 'quiz', label: 'Question banks' },
-            { to: '/assessments', icon: 'quiz', label: 'Assessments' },
-            { to: '/library', icon: 'video_library', label: 'Library' },
-            config.routes.practiceLabs && { to: '/learn', icon: 'school', label: 'Courses' },
-            config.routes.learningPaths && { to: '/learn/paths', icon: 'route', label: 'Learning paths' },
-            { to: '/resources', icon: 'menu_book', label: 'Resources' },
-            { to: '/notes', icon: 'edit_note', label: 'Notes' },
-            { to: '/community', icon: 'forum', label: 'Community' },
-            { to: '/my-profile', icon: 'badge', label: 'My Profile' },
+            { to: '/trainer', icon: 'space_dashboard', label: 'Dashboard', end: true },
+            { heading: 'Teaching' },
+            config.routes.practiceLabs && { to: '/learn', icon: 'school', label: 'My courses' },
+            { to: '/trainer?tab=assessments', icon: 'quiz', label: 'Assessments', end: true },
+            { to: '/trainer?tab=assignments', icon: 'assignment', label: 'Assignments', end: true },
+            { to: '/trainer?tab=assignments&focus=grading', icon: 'grading', label: 'Grading queue', end: true },
+            { to: '/trainer/question-banks', icon: 'database', label: 'Question banks' },
+            { to: '/trainer?tab=library', icon: 'video_library', label: 'Content library', end: true },
+            { to: '/community', icon: 'meeting_room', label: 'Classrooms' },
+            { heading: 'Management' },
+            { to: '/trainer?tab=trainees', icon: 'groups', label: 'Learners', end: true },
+            { to: '/trainer?tab=cohorts', icon: 'group_work', label: 'Cohorts', end: true },
+            { to: '/trainer?tab=compliance', icon: 'fact_check', label: 'Required training', end: true },
+            { to: '/trainer?tab=reports', icon: 'analytics', label: 'Reports', end: true },
+            { heading: 'Personal' },
+            { to: '/trainer?tab=competencies', icon: 'workspace_premium', label: 'Teaching competencies', end: true },
+            { to: '/my-profile', icon: 'badge', label: 'Professional profile' },
+            { to: '/settings', icon: 'settings', label: 'Settings' },
           ]
         : [
             config.routes.dashboard && { to: '/', icon: 'grid_view', label: 'Dashboard', end: true },
@@ -91,6 +98,7 @@ function Sidebar({ config, isSidebarOpen, onClose }) {
               label: 'Learning Paths',
             },
             { to: '/assessments', icon: 'quiz', label: 'Assessments' },
+            { to: '/assignments', icon: 'assignment', label: 'Assignments' },
             { to: '/library', icon: 'video_library', label: 'Library' },
             config.routes.upcomingCtf && { to: '/events', icon: 'event_upcoming', label: 'Events' },
             { to: '/resources', icon: 'menu_book', label: 'Resources' },
@@ -162,6 +170,11 @@ function Sidebar({ config, isSidebarOpen, onClose }) {
 
         <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain mt-3 rounded-2xl bg-surface-container-lowest p-2 flex flex-col gap-0.5">
           {navItems.map((item) => (
+            item.heading ? (
+              <p className="px-3 pb-1 pt-4 font-headline text-[10px] font-extrabold uppercase tracking-[0.18em] text-on-surface-variant/60" key={item.heading}>
+                {item.heading}
+              </p>
+            ) : (
             <NavLink
               className={navLinkClass}
               end={item.end}
@@ -172,6 +185,7 @@ function Sidebar({ config, isSidebarOpen, onClose }) {
               <span className="material-symbols-outlined">{item.icon}</span>
               <span className="nav-label">{item.label}</span>
             </NavLink>
+            )
           ))}
 
           {activeSessions.length ? (
@@ -243,7 +257,7 @@ function Sidebar({ config, isSidebarOpen, onClose }) {
       </aside>
 
       <nav className="md:hidden fixed bottom-0 left-0 right-0 glass-nav border-t border-outline-variant/60 flex items-center gap-2 overflow-x-auto px-3 py-2 z-50">
-        {navItems.map((item) => (
+        {navItems.filter((item) => !item.heading).map((item) => (
           <NavLink
             className={mobileLinkClass}
             end={item.end}

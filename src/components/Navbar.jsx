@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { getAuthSession, hasRole, ROLES } from '../auth'
 import { apiFetch } from '../services/api'
 import GlobalSearch from './GlobalSearch'
 
@@ -8,11 +9,30 @@ const NOTIFICATIONS_UPDATED_KEY = 'incognitrix_notifications_updated_at'
 
 function Navbar({ config, isSidebarOpen, onLogout, onToggleSidebar }) {
   const navigate = useNavigate()
+  const location = useLocation()
+  const session = getAuthSession()
+  const isTrainer = hasRole(session, ROLES.TRAINER)
   const [notifications, setNotifications] = useState([])
   const [showNotifications, setShowNotifications] = useState(false)
   const notificationsRef = useRef(null)
+  const quickCreateRef = useRef(null)
+  const profileRef = useRef(null)
+  const [showQuickCreate, setShowQuickCreate] = useState(false)
+  const [showProfile, setShowProfile] = useState(false)
   const [streak, setStreak] = useState({ currentStreak: 0 })
   const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false)
+
+  const trainerPageTitle = (() => {
+    if (location.pathname.startsWith('/trainer/question-banks')) return 'Question banks'
+    if (location.pathname.includes('/grading')) return 'Grading queue'
+    if (location.pathname.startsWith('/trainer/assignments')) return 'Assignments'
+    if (location.pathname.startsWith('/trainer/assessments')) return 'Assessments'
+    if (location.pathname === '/learn') return 'My courses'
+    if (location.pathname === '/community') return 'Classrooms'
+    if (location.pathname === '/my-profile') return 'Professional profile'
+    if (location.pathname === '/settings') return 'Settings'
+    return 'Trainer dashboard'
+  })()
   const [showLanguageMenu, setShowLanguageMenu] = useState(false)
   const languageRef = useRef(null)
 
@@ -106,6 +126,12 @@ function Navbar({ config, isSidebarOpen, onLogout, onToggleSidebar }) {
       }
       if (languageRef.current && !languageRef.current.contains(e.target)) {
         setShowLanguageMenu(false)
+      }
+      if (quickCreateRef.current && !quickCreateRef.current.contains(e.target)) {
+        setShowQuickCreate(false)
+      }
+      if (profileRef.current && !profileRef.current.contains(e.target)) {
+        setShowProfile(false)
       }
     }
 
@@ -233,44 +259,83 @@ function Navbar({ config, isSidebarOpen, onLogout, onToggleSidebar }) {
         </button>
         <div className="flex min-w-0 flex-col">
           <h1 className="truncate text-xl md:text-2xl font-headline font-extrabold tracking-tight text-on-surface leading-none">
-            Minerva
+            {isTrainer ? trainerPageTitle : 'Minerva'}
           </h1>
           <span className="hidden sm:block truncate font-body text-[11px] text-on-surface-variant mt-1">
-            Online Learning Academy
+            {isTrainer ? 'Trainer workspace' : 'Online Learning Academy'}
           </span>
         </div>
         <nav className="hidden xl:flex items-center gap-6 font-headline tracking-tight text-[15px] whitespace-nowrap">
-          {config.routes.learningPaths ? (
+          {isTrainer ? (
+            <>
+              <NavLink className={navItemClass} end to="/trainer">Dashboard</NavLink>
+              <NavLink className={navItemClass} to="/learn">My courses</NavLink>
+              <NavLink className={navItemClass} to="/trainer?tab=assessments">Assessments</NavLink>
+              <NavLink className={navItemClass} to="/trainer?tab=assignments">Assignments</NavLink>
+            </>
+          ) : config.routes.learningPaths ? (
             <NavLink className={navItemClass} to="/learn/paths">
               Learning Paths
             </NavLink>
           ) : null}
-          {config.routes.practiceLabs ? (
+          {!isTrainer && config.routes.practiceLabs ? (
             <NavLink className={navItemClass} to="/learn">
               Courses
             </NavLink>
           ) : null}
-          <NavLink className={navItemClass} to="/resources">
+          {!isTrainer ? <NavLink className={navItemClass} to="/resources">
             Resources
-          </NavLink>
-          <NavLink className={navItemClass} to="/roadmap">
+          </NavLink> : null}
+          {!isTrainer ? <NavLink className={navItemClass} to="/roadmap">
             Roadmap
-          </NavLink>
-          <NavLink className={navItemClass} to="/projects">
+          </NavLink> : null}
+          {!isTrainer ? <NavLink className={navItemClass} to="/projects">
             Projects
-          </NavLink>
+          </NavLink> : null}
         </nav>
       </div>
       <div className="flex shrink-0 items-center gap-3 xl:gap-4">
         {config.features.navbarSearch ? (
           <GlobalSearch className="hidden 2xl:block" />
         ) : null}
-        <div className="hidden lg:flex items-center gap-2 px-4 py-2 bg-butter rounded-full whitespace-nowrap">
+        {!isTrainer ? <div className="hidden lg:flex items-center gap-2 px-4 py-2 bg-butter rounded-full whitespace-nowrap">
           <span className="material-symbols-outlined text-on-butter text-base">local_fire_department</span>
           <span className="font-headline text-xs font-bold text-on-butter">
             {Number(streak.currentStreak || 0)}-day streak
           </span>
-        </div>
+        </div> : null}
+        {isTrainer ? (
+          <div className="relative" ref={quickCreateRef}>
+            <button
+              className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 font-headline text-xs font-bold text-on-primary hover:opacity-90"
+              onClick={() => setShowQuickCreate((open) => !open)}
+              type="button"
+            >
+              <span className="material-symbols-outlined text-base">add</span>
+              <span className="hidden sm:inline">Create</span>
+            </button>
+            {showQuickCreate ? (
+              <div className="absolute right-0 top-full mt-3 w-64 overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest p-2 shadow-lift">
+                {[
+                  ['/trainer/assessments/new', 'quiz', 'Assessment'],
+                  ['/trainer/assignments/new', 'assignment_add', 'Assignment'],
+                  ['/trainer/question-banks', 'database', 'Question bank'],
+                  ['/trainer?tab=library&upload=1', 'upload_file', 'Library material'],
+                  ['/community', 'meeting_room', 'Classroom'],
+                ].map(([to, icon, label]) => (
+                  <button
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left font-headline text-sm font-bold text-on-surface hover:bg-surface-container-high"
+                    key={label}
+                    onClick={() => { setShowQuickCreate(false); navigate(to) }}
+                    type="button"
+                  >
+                    <span className="material-symbols-outlined text-primary">{icon}</span>{label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         <div className="flex items-center gap-3 text-on-surface-variant">
           {config.features.navbarNotifications ? (
             <div ref={notificationsRef} className="relative">
@@ -371,6 +436,7 @@ function Navbar({ config, isSidebarOpen, onLogout, onToggleSidebar }) {
             )}
           </div>
           {config.features.navbarSettings ? (
+          {!isTrainer && config.features.navbarSettings ? (
             <button
               className="inline-flex items-center justify-center hover:text-on-surface transition-colors"
               onClick={() => navigate('/settings')}
@@ -381,13 +447,26 @@ function Navbar({ config, isSidebarOpen, onLogout, onToggleSidebar }) {
             </button>
           ) : null}
         </div>
-        <button
-          className="rounded-full hidden sm:inline-flex px-4 xl:px-5 py-2.5 border border-outline-variant bg-surface-container-lowest text-on-surface-variant font-headline text-xs font-bold hover:bg-surface-container-high hover:text-on-surface transition-colors"
-          onClick={() => setConfirmLogoutOpen(true)}
-          type="button"
-        >
-          Logout
-        </button>
+        {isTrainer ? (
+          <div className="relative" ref={profileRef}>
+            <button className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container" onClick={() => setShowProfile((open) => !open)} title="Trainer account" type="button">
+              <span className="material-symbols-outlined">account_circle</span>
+            </button>
+            {showProfile ? (
+              <div className="absolute right-0 top-full mt-3 w-64 overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest p-2 shadow-lift">
+                <div className="border-b border-outline-variant px-3 py-3"><p className="truncate font-headline text-sm font-extrabold text-on-surface">{session?.username || 'Trainer'}</p><p className="font-body text-xs text-on-surface-variant">Trainer account</p></div>
+                {[
+                  ['/my-profile', 'badge', 'Professional profile'],
+                  ['/settings', 'settings', 'Account settings'],
+                  ['/settings', 'password', 'Change password'],
+                ].map(([to, icon, label]) => <button className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left font-headline text-sm font-bold text-on-surface hover:bg-surface-container-high" key={label} onClick={() => { setShowProfile(false); navigate(to) }} type="button"><span className="material-symbols-outlined text-primary">{icon}</span>{label}</button>)}
+                <button className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left font-headline text-sm font-bold text-error hover:bg-blush" onClick={() => { setShowProfile(false); setConfirmLogoutOpen(true) }} type="button"><span className="material-symbols-outlined">logout</span>Logout</button>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <button className="rounded-full hidden sm:inline-flex px-4 xl:px-5 py-2.5 border border-outline-variant bg-surface-container-lowest text-on-surface-variant font-headline text-xs font-bold hover:bg-surface-container-high hover:text-on-surface transition-colors" onClick={() => setConfirmLogoutOpen(true)} type="button">Logout</button>
+        )}
       </div>
       </header>
 

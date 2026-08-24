@@ -168,6 +168,23 @@ router.post('/signup', async (req, res) => {
     return res.status(403).json({ message: 'Public registration is currently disabled' })
   }
 
+  const [existingAccounts] = await pool.query(
+    `SELECT id, role, approval_status
+     FROM users
+     WHERE LOWER(email) = LOWER(?)
+     LIMIT 1`,
+    [email],
+  )
+  if (existingAccounts.length) {
+    const existingRole = normaliseRole(existingAccounts[0].role)
+    if (requestedRole === ROLES.TRAINER && existingRole === ROLES.TRAINER) {
+      return res.status(409).json({
+        message: 'A trainer account with this email already exists',
+      })
+    }
+    return res.status(409).json({ message: 'An account with this email already exists' })
+  }
+
   const username = await uniqueUsername(
     slugifyUsername(`${firstName}${lastName ? `_${lastName}` : ''}`) || slugifyUsername(email.split('@')[0]),
   )
@@ -203,7 +220,12 @@ router.post('/signup', async (req, res) => {
     })
   } catch (error) {
     if (error?.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ message: 'An account with that email already exists' })
+      return res.status(409).json({
+        message:
+          requestedRole === ROLES.TRAINER
+            ? 'A trainer account with this email already exists'
+            : 'An account with this email already exists',
+      })
     }
     throw error
   }

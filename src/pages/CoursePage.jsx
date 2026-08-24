@@ -997,6 +997,12 @@ function CoursePage() {
           <p className="text-on-surface-variant max-w-2xl text-lg font-body leading-relaxed">
             {room.description}
           </p>
+          {room.trainerName ? (
+            <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-secondary-container px-4 py-2 text-on-secondary-container">
+              <span className="material-symbols-outlined text-base">co_present</span>
+              <span className="font-headline text-sm font-bold">Trainer: {room.trainerName}</span>
+            </div>
+          ) : null}
         </header>
 
         <div className={`grid grid-cols-1 ${isTerminalSplitLayout ? 'xl:grid-cols-[minmax(0,1fr)_minmax(34rem,0.9fr)] gap-8 items-start' : 'lg:grid-cols-12 gap-12'}`}>
