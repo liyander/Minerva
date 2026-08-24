@@ -36,6 +36,26 @@ function Navbar({ config, isSidebarOpen, onLogout, onToggleSidebar }) {
   const [showLanguageMenu, setShowLanguageMenu] = useState(false)
   const languageRef = useRef(null)
 
+  const toggleDropdown = (target) => {
+    const shouldOpen = {
+      create: !showQuickCreate,
+      notifications: !showNotifications,
+      language: !showLanguageMenu,
+      profile: !showProfile,
+    }[target]
+
+    setShowQuickCreate(false)
+    setShowNotifications(false)
+    setShowLanguageMenu(false)
+    setShowProfile(false)
+
+    if (!shouldOpen) return
+    if (target === 'create') setShowQuickCreate(true)
+    if (target === 'notifications') setShowNotifications(true)
+    if (target === 'language') setShowLanguageMenu(true)
+    if (target === 'profile') setShowProfile(true)
+  }
+
   const navItemClass = ({ isActive }) =>
     `transition-colors duration-200 ${
       isActive
@@ -135,8 +155,20 @@ function Navbar({ config, isSidebarOpen, onLogout, onToggleSidebar }) {
       }
     }
 
+    const handleEscape = (event) => {
+      if (event.key !== 'Escape') return
+      setShowNotifications(false)
+      setShowLanguageMenu(false)
+      setShowQuickCreate(false)
+      setShowProfile(false)
+    }
+
     document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
   }, [])
 
 
@@ -232,7 +264,9 @@ function Navbar({ config, isSidebarOpen, onLogout, onToggleSidebar }) {
           <div className="relative" ref={quickCreateRef}>
             <button
               className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 font-headline text-xs font-bold text-on-primary hover:opacity-90"
-              onClick={() => setShowQuickCreate((open) => !open)}
+              aria-expanded={showQuickCreate}
+              aria-haspopup="menu"
+              onClick={() => toggleDropdown('create')}
               type="button"
             >
               <span className="material-symbols-outlined text-base">add</span>
@@ -265,7 +299,9 @@ function Navbar({ config, isSidebarOpen, onLogout, onToggleSidebar }) {
             <div ref={notificationsRef} className="relative">
               <button
                 type="button"
-                onClick={() => setShowNotifications(!showNotifications)}
+                aria-expanded={showNotifications}
+                aria-haspopup="menu"
+                onClick={() => toggleDropdown('notifications')}
                 className="relative hover:text-on-surface transition-colors"
               >
                 <span className="material-symbols-outlined">notifications</span>
@@ -332,7 +368,9 @@ function Navbar({ config, isSidebarOpen, onLogout, onToggleSidebar }) {
           <div ref={languageRef} className="relative hidden sm:block">
             <button
               type="button"
-              onClick={() => setShowLanguageMenu(!showLanguageMenu)}
+              aria-expanded={showLanguageMenu}
+              aria-haspopup="menu"
+              onClick={() => toggleDropdown('language')}
               className="relative hover:text-on-surface transition-colors inline-flex items-center justify-center mt-1"
               title="Translate"
             >
@@ -372,7 +410,7 @@ function Navbar({ config, isSidebarOpen, onLogout, onToggleSidebar }) {
         </div>
         {isTrainer ? (
           <div className="relative" ref={profileRef}>
-            <button className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container" onClick={() => setShowProfile((open) => !open)} title="Trainer account" type="button">
+            <button aria-expanded={showProfile} aria-haspopup="menu" className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container" onClick={() => toggleDropdown('profile')} title="Trainer account" type="button">
               <span className="material-symbols-outlined">account_circle</span>
             </button>
             {showProfile ? (
