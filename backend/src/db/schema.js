@@ -424,10 +424,10 @@ export const CORE_TABLES = [
   'developer_documents',
 ]
 
-export const EXPECTED_TABLES = [...CORE_TABLES, ...TRAINING_TABLES, ...COMMUNITY_TABLES, ...FEATURE_TABLES]
 export const EXPECTED_TABLES = [
   ...CORE_TABLES,
   ...TRAINING_TABLES,
+  ...COMMUNITY_TABLES,
   ...PLATFORM_TABLES,
   ...FEATURE_TABLES,
 ]
@@ -512,12 +512,16 @@ export async function createCoreTables(conn) {
   await conn.query(CORE_TABLE_DDL)
   // Training-domain tables depend on users/rooms/career_paths, so they run second.
   await conn.query(TRAINING_TABLE_DDL)
-  // Community tables depend on users/classrooms, so they run last.
+  // Community tables depend on users and create the classroom domain.
   await conn.query(COMMUNITY_TABLE_DDL)
-  return CORE_TABLES.length + TRAINING_TABLES.length + COMMUNITY_TABLES.length
-  // Platform tables depend on assessments and trainer_library_items in turn.
+  // Platform tables depend on assessments and trainer_library_items.
   await conn.query(PLATFORM_TABLE_DDL)
-  return CORE_TABLES.length + TRAINING_TABLES.length + PLATFORM_TABLES.length
+  return (
+    CORE_TABLES.length
+    + TRAINING_TABLES.length
+    + COMMUNITY_TABLES.length
+    + PLATFORM_TABLES.length
+  )
 }
 
 export async function applyColumnMigrations(conn) {
