@@ -1,0 +1,1 @@
+CREATE DATABASE IF NOT EXISTS incognitrix_academy; CREATE USER IF NOT EXISTS 'CTF'@'localhost' IDENTIFIED BY 'root'; GRANT ALL PRIVILEGES ON incognitrix_academy.* TO 'CTF'@'localhost'; FLUSH PRIVILEGES;
