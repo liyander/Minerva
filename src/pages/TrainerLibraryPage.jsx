@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import PageHeader from '../components/PageHeader'
 import { fetchLibrary, fetchLibraryFile } from '../services/training'
+import { fetchLectureProgress, saveLectureProgress } from '../services/platform'
 
 const TYPE_META = {
   lecture: { label: 'Recorded lecture', icon: 'smart_display', accent: 'bg-blush text-on-blush' },
@@ -16,11 +17,15 @@ function TrainerLibraryPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [openingId, setOpeningId] = useState(null)
+  const [progress, setProgress] = useState({})
+  const [player, setPlayer] = useState(null)
 
   const load = useCallback(async () => {
     setError('')
     try {
-      setItems(await fetchLibrary())
+      const [libraryRows, progressRows] = await Promise.all([fetchLibrary(), fetchLectureProgress()])
+      setItems(libraryRows)
+      setProgress(Object.fromEntries(progressRows.map((row) => [row.libraryItemId, row])))
     } catch (loadError) {
       setError(loadError?.message || 'Could not load the library.')
     } finally {
@@ -69,6 +74,10 @@ function TrainerLibraryPage() {
       const response = await fetch(file.fileData)
       const blob = await response.blob()
       const url = URL.createObjectURL(blob)
+      if (item.itemType === 'lecture' && String(blob.type).startsWith('video/')) {
+        setPlayer({ item, url, resume: progress[item.id]?.positionSeconds || 0 })
+        return
+      }
       window.open(url, '_blank', 'noreferrer')
       window.setTimeout(() => URL.revokeObjectURL(url), 60000)
     } catch (openError) {
@@ -198,10 +207,12 @@ function TrainerLibraryPage() {
                     {openingId === item.id ? 'Opening…' : 'Open'}
                   </button>
                 </div>
+                {progress[item.id] ? <div className="h-1.5 overflow-hidden rounded-full bg-surface-container-high"><div className="h-full bg-primary" style={{ width: `${progress[item.id].percentage}%` }} /></div> : null}
               </article>
             )
           })}
         </div>
+        {player ? <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-5"><section className="w-full max-w-4xl rounded-3xl bg-surface-container-lowest p-5 shadow-lift"><div className="mb-4 flex items-center justify-between"><div><h2 className="font-headline text-lg font-extrabold">{player.item.title}</h2><p className="text-xs text-on-surface-variant">Resumes across devices</p></div><button className="material-symbols-outlined" onClick={() => { URL.revokeObjectURL(player.url); setPlayer(null) }} type="button">close</button></div><video className="max-h-[70vh] w-full rounded-2xl bg-black" controls onLoadedMetadata={(event) => { event.currentTarget.currentTime = Math.min(player.resume, Math.max(0, event.currentTarget.duration - 1)) }} onPause={(event) => void saveLectureProgress(player.item.id, { positionSeconds: event.currentTarget.currentTime, durationSeconds: event.currentTarget.duration })} onTimeUpdate={(event) => { const video = event.currentTarget; if (Math.floor(video.currentTime) % 10 === 0) void saveLectureProgress(player.item.id, { positionSeconds: video.currentTime, durationSeconds: video.duration }) }} src={player.url} /></section></div> : null}
       </div>
     </main>
   )

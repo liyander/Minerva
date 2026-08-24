@@ -123,6 +123,19 @@ export async function runDeadlineReminders({ withinDays = env.mail.reminderWindo
   )
   for (const row of eventRows) push(row, `${row.title} (event)`, row.deadline)
 
+  // Timetable and live-class reminders. Cohort events go only to members;
+  // published organisation-wide events go to all active trainees.
+  const [calendarRows] = await pool.query(
+    `SELECT DISTINCT u.id,u.email,u.first_name,u.username,event.title,event.starts_at deadline
+     FROM calendar_events event
+     JOIN users u ON u.role IN ('trainee','operator') AND u.is_active=true
+     LEFT JOIN cohort_members member ON member.cohort_id=event.cohort_id AND member.user_id=u.id
+     WHERE event.is_published=true AND event.starts_at BETWEEN NOW() AND ?
+       AND (event.cohort_id IS NULL OR member.user_id IS NOT NULL)`,
+    [horizonSql],
+  )
+  for (const row of calendarRows) push(row, `${row.title} (scheduled session)`, row.deadline)
+
   // Mandatory training due soon, resolved through cohort or department.
   const [requirementRows] = await pool.query(
     `SELECT u.id, u.email, u.first_name, u.username, t.title, t.due_on,

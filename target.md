@@ -93,25 +93,25 @@ This file is the implementation tracker for the next platform features.
 
 ## Learning experience
 
-- [ ] **Prerequisites and progression gating**
+- [x] ~~**Prerequisites and progression gating**~~
   - Let trainers configure module prerequisites.
   - Prevent access until prerequisite completion conditions are satisfied.
   - Explain locked content and the exact unlock requirements to trainees.
   - Allow authorized administrators to override gating when necessary.
 
-- [ ] **Lecture resume position and course-linked notes**
+- [x] ~~**Lecture resume position and course-linked notes**~~
   - Persist lecture playback position and completion status per trainee.
   - Resume playback across devices.
   - Attach notes to courses, modules, lectures, or timestamps.
   - Preserve support for general free-form notes.
 
-- [ ] **Unified full-text search**
+- [x] ~~**Unified full-text search**~~
   - Search courses, paths, modules, trainer-library items, and research resources.
   - Apply role and publication visibility rules to results.
   - Support filters by stream, subject, content type, trainer, and difficulty.
   - Provide keyboard-accessible navigation and useful empty states.
 
-- [ ] **Timetable and attendance**
+- [x] ~~**Timetable and attendance**~~
   - Schedule classes, practical sessions, assessments, and trainer availability.
   - Provide trainee, trainer, cohort, and administrator calendar views.
   - Record attendance manually or through session check-in.
@@ -119,28 +119,28 @@ This file is the implementation tracker for the next platform features.
   - Show attendance percentages and flag configurable shortage thresholds.
   - Support calendar export and integration-ready event data.
 
-- [ ] **Live classes and recordings**
+- [x] ~~**Live classes and recordings**~~
   - Create live sessions with meeting links, trainer details, capacity, and reminders.
   - Track attendance and join/leave information where integrations permit it.
   - Attach lesson materials, recordings, transcripts, and follow-up activities.
   - Publish recordings through authorized signed URLs.
   - Connect sessions to streams, cohorts, courses, modules, and timetable entries.
 
-- [ ] **Gradebook, report cards, and transcripts**
+- [x] ~~**Gradebook, report cards, and transcripts**~~
   - Provide a unified gradebook covering assessments, assignments, activities, projects, and trainer-entered grades.
   - Support configurable weighting, grading scales, pass rules, and moderation.
   - Calculate totals, percentages, letter grades, GPA, or institution-defined outcomes.
   - Generate downloadable report cards and verified transcripts.
   - Preserve grade-change history and record changes in the audit log.
 
-- [ ] **Projects and student portfolios**
+- [x] ~~**Projects and student portfolios**~~
   - Support individual and group projects with milestones, deliverables, mentors, and review dates.
   - Allow trainers to assess milestones and final outcomes using rubrics.
   - Let trainees publish approved projects, evidence, skills, and reflections to a portfolio.
   - Provide privacy controls for private, organisation-only, and public portfolio items.
   - Generate a shareable portfolio link without exposing unrelated profile data.
 
-- [ ] **Universal skill passport**
+- [x] ~~**Universal skill passport**~~
   - Build a verified skill profile from courses, assessments, assignments, activities, projects, trainer evaluations, and work experience.
   - Distinguish declared skills from demonstrated and trainer-verified skills.
   - Show proficiency, supporting evidence, last-demonstrated date, and expiry where relevant.

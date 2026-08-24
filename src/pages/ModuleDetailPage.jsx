@@ -7,6 +7,7 @@ import {
 import { getCoursesData } from '../data/coursesData'
 import { apiFetch } from '../services/api'
 import { parseMarkdownToHtml } from '../utils/markdown'
+import { fetchPathGating } from '../services/platform'
 
 function renderRichContent(content, htmlOverride = '') {
   if (content && String(content).trim()) {
@@ -23,6 +24,7 @@ function ModuleDetailPage() {
   const { pathId, moduleId } = useParams()
   const [careerPaths, setCareerPaths] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [gating, setGating] = useState([])
 
   useEffect(() => {
     let cancelled = false
@@ -54,6 +56,10 @@ function ModuleDetailPage() {
 
   const path = careerPaths.find((item) => item.id === pathId || item.slug === pathId)
   const module = path?.modules?.find((m) => m.id === moduleId)
+  useEffect(() => {
+    if (!path?.id) return
+    fetchPathGating(path.id).then((result) => setGating(result.modules || [])).catch(() => setGating([]))
+  }, [path?.id])
   const allRooms = getCoursesData()
   const moduleOverviewSource =
     module?.content?.markdown || module?.markdown || module?.description || ''
@@ -75,6 +81,10 @@ function ModuleDetailPage() {
   // Redirect if path or module not found after loading
   if (!path || !module) {
     return <Navigate to="/learn/paths" replace />
+  }
+  const gate = gating.find((item) => String(item.id) === String(module.id))
+  if (gate?.locked) {
+    return <main className="min-h-screen bg-surface px-6 pt-32"><section className="mx-auto max-w-2xl rounded-3xl bg-surface-container-lowest p-8 text-center shadow-soft"><span className="material-symbols-outlined text-5xl text-primary">lock</span><h1 className="mt-4 font-headline text-2xl font-extrabold">Module locked</h1><p className="mt-3 text-sm text-on-surface-variant">Complete {gate.blockedBy.join(', ')} to unlock {module.title}.</p><button className="mt-6 rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-on-primary" onClick={() => navigate(`/learn/path/${pathId}`)} type="button">Back to learning path</button></section></main>
   }
 
   return (

@@ -16,6 +16,10 @@ function serializeNote(row) {
     id: Number(row.id),
     title: String(row.title || 'Untitled note'),
     content: String(row.content || ''),
+    roomId: row.room_id || null,
+    moduleId: row.module_id || null,
+    libraryItemId: row.library_item_id || null,
+    timestampSeconds: row.timestamp_seconds === null ? null : Number(row.timestamp_seconds),
     createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
     updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null,
   }
@@ -23,7 +27,7 @@ function serializeNote(row) {
 
 async function fetchNote(userId, noteId) {
   const [rows] = await pool.query(
-    `SELECT id, title, content, created_at, updated_at
+    `SELECT id, title, content, room_id, module_id, library_item_id, timestamp_seconds, created_at, updated_at
      FROM user_notes
      WHERE id = ? AND user_id = ?
      LIMIT 1`,
@@ -36,7 +40,7 @@ async function fetchNote(userId, noteId) {
 router.get('/', async (req, res, next) => {
   try {
     const [rows] = await pool.query(
-      `SELECT id, title, content, created_at, updated_at
+      `SELECT id, title, content, room_id, module_id, library_item_id, timestamp_seconds, created_at, updated_at
        FROM user_notes
        WHERE user_id = ?
        ORDER BY updated_at DESC, id DESC`,
@@ -55,9 +59,10 @@ router.post('/', async (req, res, next) => {
     const content = String(req.body?.content || '')
 
     const [result] = await pool.query(
-      `INSERT INTO user_notes (user_id, title, content)
-       VALUES (?, ?, ?)`,
-      [req.user.id, title.slice(0, 255), content],
+      `INSERT INTO user_notes (user_id, title, content, room_id, module_id, library_item_id, timestamp_seconds)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [req.user.id, title.slice(0, 255), content, req.body?.roomId || null, req.body?.moduleId || null,
+        req.body?.libraryItemId || null, req.body?.timestampSeconds ?? null],
     )
 
     const note = await fetchNote(req.user.id, result.insertId)
@@ -88,9 +93,11 @@ router.put('/:id', async (req, res, next) => {
 
     await pool.query(
       `UPDATE user_notes
-       SET title = ?, content = ?
+       SET title = ?, content = ?, room_id = ?, module_id = ?, library_item_id = ?, timestamp_seconds = ?
        WHERE id = ? AND user_id = ?`,
-      [title, content, noteId, req.user.id],
+      [title, content, req.body?.roomId ?? existing.room_id, req.body?.moduleId ?? existing.module_id,
+        req.body?.libraryItemId ?? existing.library_item_id, req.body?.timestampSeconds ?? existing.timestamp_seconds,
+        noteId, req.user.id],
     )
 
     const note = await fetchNote(req.user.id, noteId)

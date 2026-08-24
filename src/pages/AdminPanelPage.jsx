@@ -94,6 +94,12 @@ function AdminPanelPage({ config, onConfigChange, onLogout, username }) {
             Training Platform
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="rounded-2xl bg-surface-container-lowest shadow-soft p-6 hover:bg-surface-container-high transition-all cursor-pointer">
+              <a className="block" href="/learning-hub">
+                <div className="flex items-start justify-between mb-4"><div className="flex items-center gap-3"><span className="material-symbols-outlined text-primary" style={{ fontSize: '32px' }}>school</span><div><h3 className="font-headline text-lg font-bold">Learning experience</h3><p className="text-xs text-on-surface-variant">Calendar, grades, projects and skills</p></div></div><span className="material-symbols-outlined text-on-surface-variant">chevron_right</span></div>
+                <p className="text-sm text-on-surface-variant">Manage timetable, live sessions, gradebook, portfolios, skill passports and progression rules.</p>
+              </a>
+            </div>
             {[
               {
                 href: '/admin/cohorts',

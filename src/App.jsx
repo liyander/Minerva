@@ -77,6 +77,8 @@ import ProjectsPage from './pages/ProjectsPage'
 import ProjectDetailPage from './pages/ProjectDetailPage'
 import CommunityPage from './pages/CommunityPage'
 import ActivityPage from './pages/ActivityPage'
+import LearningExperiencePage from './pages/LearningExperiencePage'
+import PublicSharePage from './pages/PublicSharePage'
 import { getSavedTheme, toggleTheme as toggleThemeSetting } from './services/theme'
 
 function ControlledOutageScreen() {
@@ -119,7 +121,7 @@ function App() {
   const [theme, setTheme] = useState(getSavedTheme)
   const platformConfigSaveRef = useRef({ inFlight: false, version: 0 })
   const location = useLocation()
-  const isPublicVerificationRoute = location.pathname.startsWith('/verify-certificate')
+  const isPublicVerificationRoute = location.pathname.startsWith('/verify-certificate') || location.pathname.startsWith('/share/')
 
   const toggleTheme = () => {
     setTheme((current) => toggleThemeSetting(current))
@@ -303,6 +305,7 @@ function App() {
       <Routes>
         <Route path="/verify-certificate" element={<CertificateVerificationPage />} />
         <Route path="/verify-certificate/:certificateId" element={<CertificateVerificationPage />} />
+        <Route path="/share/:token" element={<PublicSharePage />} />
         <Route path="*" element={<NotFoundPage variant="public" />} />
       </Routes>
     )
@@ -314,6 +317,7 @@ function App() {
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/verify-certificate" element={<CertificateVerificationPage />} />
         <Route path="/verify-certificate/:certificateId" element={<CertificateVerificationPage />} />
+        <Route path="/share/:token" element={<PublicSharePage />} />
         <Route
           path="/login"
           element={<LoginPage onLoginSuccess={setAuthSession} />}
@@ -376,6 +380,7 @@ function App() {
           <Route path="/admin/cohorts" element={<AdminCohortsPage />} />
           <Route path="/admin/compliance" element={<AdminCompliancePage />} />
           <Route path="/admin/reports" element={<AdminReportsPage />} />
+          <Route path="/learning-hub" element={<LearningExperiencePage />} />
           <Route path="/trainer" element={<TrainerWorkspacePage />} />
           <Route path="/trainer/assessments/new" element={<AssessmentEditorPage />} />
           <Route path="/trainer/assessments/:assessmentId" element={<AssessmentEditorPage />} />
@@ -446,6 +451,7 @@ function App() {
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/activity" element={<ActivityPage />} />
+            <Route path="/learning-hub" element={<LearningExperiencePage />} />
             <Route path="/verify-certificate" element={<CertificateVerificationPage />} />
             <Route path="*" element={<NotFoundPage variant="admin" />} />
           </Routes>
@@ -602,6 +608,7 @@ function App() {
           <Route path="/assessments/:assessmentId" element={<AssessmentAttemptPage />} />
           <Route path="/assignments" element={<AssignmentsPage />} />
           <Route path="/assignments/:assignmentId" element={<AssignmentDetailPage />} />
+          <Route path="/learning-hub" element={<LearningExperiencePage />} />
           <Route path="/library" element={<TrainerLibraryPage />} />
           <Route path="/my-profile" element={<ProfessionalProfilePage />} />
           <Route

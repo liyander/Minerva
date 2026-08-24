@@ -12,6 +12,7 @@ import {
   markLabStarted,
 } from '../services/labProgress'
 import { parseMarkdownToHtml } from '../utils/markdown'
+import { fetchCourseAccess } from '../services/platform'
 
 function renderRichContent(content, htmlOverride = '') {
   if (htmlOverride && String(htmlOverride).trim()) {
@@ -94,6 +95,7 @@ function CoursePage() {
   const { courseId } = useParams()
   const [room, setRoom] = useState(() => getCoursesData().find((item) => item.slug === courseId) || null)
   const [isLoadingRoom, setIsLoadingRoom] = useState(true)
+  const [courseAccess, setCourseAccess] = useState({ allowed: true })
   const [labStatus, setLabStatus] = useState('in-progress')
   const [questionStatus, setQuestionStatus] = useState({
     enabled: false,
@@ -209,6 +211,10 @@ function CoursePage() {
     return () => {
       cancelled = true
     }
+  }, [courseId])
+
+  useEffect(() => {
+    fetchCourseAccess(courseId).then(setCourseAccess).catch(() => setCourseAccess({ allowed: true }))
   }, [courseId])
 
   useEffect(() => {
@@ -648,6 +654,10 @@ function CoursePage() {
 
   if (!room) {
     return <Navigate to="/learn" replace />
+  }
+
+  if (!courseAccess.allowed) {
+    return <main className="min-h-screen bg-surface px-6 pt-32"><section className="mx-auto max-w-2xl rounded-3xl bg-surface-container-lowest p-8 text-center shadow-soft"><span className="material-symbols-outlined text-5xl text-primary">lock</span><h1 className="mt-4 font-headline text-2xl font-extrabold">Course locked</h1><p className="mt-3 text-sm text-on-surface-variant">Complete {courseAccess.blockedBy?.join(', ')} before opening this course in {courseAccess.moduleTitle}.</p></section></main>
   }
 
   const primaryMarkdown = room.content?.markdown || ''

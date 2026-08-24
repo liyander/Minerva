@@ -98,13 +98,48 @@ export const fetchMyRequirements = () => apiFetch('/compliance/me')
 
 /* -------------------------------------------------------------- learning --- */
 export const fetchPathGating = (pathId) => apiFetch(`/learning/paths/${pathId}/gating`)
+export const fetchCourseAccess = (courseId) => apiFetch(`/learning/courses/${courseId}/access`)
 export const saveModulePrerequisites = (moduleId, requires) =>
   apiFetch(`/learning/modules/${moduleId}/prerequisites`, { method: 'PUT', ...json({ requires }) })
 export const saveLectureProgress = (itemId, payload) =>
   apiFetch(`/learning/lectures/${itemId}/progress`, { method: 'PUT', ...json(payload) })
 export const fetchLectureProgress = () => apiFetch('/learning/lectures/progress')
 export const searchPlatform = (q, limit) => apiFetch(`/learning/search${query({ q, limit })}`)
+export const searchLearning = (params) => apiFetch(`/learning/search${query(params)}`)
+export const saveGatingOverride = (moduleId, userId, payload) =>
+  apiFetch(`/learning/modules/${moduleId}/override/${userId}`, { method: 'PUT', ...json(payload) })
 export const fetchSkillGap = (params) => apiFetch(`/learning/skill-gap${query(params)}`)
+
+/* -------------------------------------------------- learning experience --- */
+export const fetchExperienceEvents = (params) => apiFetch(`/experience/events${query(params)}`)
+export const createExperienceEvent = (payload) => apiFetch('/experience/events', { method: 'POST', ...json(payload) })
+export const updateExperienceEvent = (id, payload) => apiFetch(`/experience/events/${id}`, { method: 'PUT', ...json(payload) })
+export const saveLiveSessionContent = (eventId, payload) => apiFetch(`/experience/sessions/${eventId}/content`, { method: 'PUT', ...json(payload) })
+export const fetchEventAttendance = (id) => apiFetch(`/experience/events/${id}/attendance`)
+export const saveAttendance = (eventId, userId, payload) => apiFetch(`/experience/events/${eventId}/attendance/${userId}`, { method: 'PUT', ...json(payload) })
+export const checkInEvent = (id, code) => apiFetch(`/experience/events/${id}/check-in`, { method: 'POST', ...json({ code }) })
+export const requestEventLeave = (id, reason) => apiFetch(`/experience/events/${id}/leave`, { method: 'POST', ...json({ reason }) })
+export const leaveLiveSession = (id) => apiFetch(`/experience/events/${id}/leave-session`, { method: 'POST' })
+export const fetchLeaveRequests = () => apiFetch('/experience/leave')
+export const reviewLeaveRequest = (id, status) => apiFetch(`/experience/leave/${id}`, { method: 'PUT', ...json({ status }) })
+export const fetchMyAttendance = () => apiFetch('/experience/attendance/me')
+export const createGradebookItem = (payload) => apiFetch('/experience/gradebook/items', { method: 'POST', ...json(payload) })
+export const saveGrade = (itemId, userId, payload) => apiFetch(`/experience/gradebook/items/${itemId}/users/${userId}`, { method: 'PUT', ...json(payload) })
+export const fetchMyGradebook = () => apiFetch('/experience/gradebook/me')
+export const fetchLearningProjects = () => apiFetch('/experience/projects')
+export const createLearningProject = (payload) => apiFetch('/experience/projects', { method: 'POST', ...json(payload) })
+export const createProjectMilestone = (id, payload) => apiFetch(`/experience/projects/${id}/milestones`, { method: 'POST', ...json(payload) })
+export const reviewProjectMilestone = (id, payload) => apiFetch(`/experience/milestones/${id}/review`, { method: 'PUT', ...json(payload) })
+export const fetchMyPortfolio = () => apiFetch('/experience/portfolio/me')
+export const fetchPortfolioReview = () => apiFetch('/experience/portfolio/review')
+export const createPortfolioItem = (payload) => apiFetch('/experience/portfolio', { method: 'POST', ...json(payload) })
+export const approvePortfolioItem = (id, approved) => apiFetch(`/experience/portfolio/${id}/approval`, { method: 'PUT', ...json({ approved }) })
+export const fetchMySkillPassport = () => apiFetch('/experience/skills/me')
+export const addSkillEvidence = (payload) => apiFetch('/experience/skills/evidence', { method: 'POST', ...json(payload) })
+export const createPublicShare = (payload) => apiFetch('/experience/shares', { method: 'POST', ...json(payload) })
+export const fetchPublicShares = () => apiFetch('/experience/shares')
+export const revokePublicShare = (id) => apiFetch(`/experience/shares/${id}`, { method: 'DELETE' })
+export const fetchPublicShare = (token) => apiFetch(`/experience/public/${token}`)
 
 /* --------------------------------------------------------------- reports --- */
 export const fetchExportList = () => apiFetch('/reports/exports')

@@ -24,6 +24,7 @@ function createLocalNote() {
     content: EMPTY_NOTE_CONTENT,
     createdAt: null,
     updatedAt: null,
+    roomId: '', moduleId: '', libraryItemId: '', timestampSeconds: '',
   }
 }
 
@@ -74,7 +75,7 @@ function NotesPage() {
         setActiveNoteId(firstNote?.id || null)
         setDraft(firstNote || createLocalNote())
         lastSavedDraftRef.current = firstNote
-          ? JSON.stringify({ id: firstNote.id, title: firstNote.title, content: firstNote.content })
+          ? JSON.stringify({ id: firstNote.id, title: firstNote.title, content: firstNote.content, roomId: firstNote.roomId, moduleId: firstNote.moduleId, libraryItemId: firstNote.libraryItemId, timestampSeconds: firstNote.timestampSeconds })
           : ''
       } catch (loadError) {
         if (!cancelled) {
@@ -102,6 +103,8 @@ function NotesPage() {
       id: noteDraft.id,
       title: noteDraft.title,
       content: noteDraft.content,
+      roomId: noteDraft.roomId, moduleId: noteDraft.moduleId,
+      libraryItemId: noteDraft.libraryItemId, timestampSeconds: noteDraft.timestampSeconds,
     })
 
     if (snapshot === lastSavedDraftRef.current) {
@@ -115,6 +118,9 @@ function NotesPage() {
       const payload = {
         title: noteDraft.title,
         content: noteDraft.content,
+        roomId: noteDraft.roomId || null, moduleId: noteDraft.moduleId || null,
+        libraryItemId: noteDraft.libraryItemId || null,
+        timestampSeconds: noteDraft.timestampSeconds === '' ? null : Number(noteDraft.timestampSeconds),
       }
       const saved = noteDraft.id
         ? await apiFetch(`/notes/${noteDraft.id}`, {
@@ -140,6 +146,8 @@ function NotesPage() {
         id: saved.id,
         title: saved.title,
         content: saved.content,
+        roomId: saved.roomId, moduleId: saved.moduleId,
+        libraryItemId: saved.libraryItemId, timestampSeconds: saved.timestampSeconds,
       })
 
       return saved
@@ -158,6 +166,8 @@ function NotesPage() {
       id: draft.id,
       title: draft.title,
       content: draft.content,
+      roomId: draft.roomId, moduleId: draft.moduleId,
+      libraryItemId: draft.libraryItemId, timestampSeconds: draft.timestampSeconds,
     })
 
     if (snapshot === lastSavedDraftRef.current) {
@@ -199,6 +209,8 @@ function NotesPage() {
       id: note.id,
       title: note.title,
       content: note.content,
+      roomId: note.roomId, moduleId: note.moduleId,
+      libraryItemId: note.libraryItemId, timestampSeconds: note.timestampSeconds,
     })
   }
 
@@ -395,6 +407,12 @@ function NotesPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 flex-1 min-h-0">
+              <div className="col-span-full grid grid-cols-2 gap-2 border-b border-outline-variant/40 p-3 lg:grid-cols-4">
+                <input className="rounded-xl bg-surface-container px-3 py-2 text-xs" onChange={(event) => updateDraft({ roomId: event.target.value })} placeholder="Course ID (optional)" value={draft.roomId || ''} />
+                <input className="rounded-xl bg-surface-container px-3 py-2 text-xs" onChange={(event) => updateDraft({ moduleId: event.target.value })} placeholder="Module ID (optional)" value={draft.moduleId || ''} />
+                <input className="rounded-xl bg-surface-container px-3 py-2 text-xs" onChange={(event) => updateDraft({ libraryItemId: event.target.value })} placeholder="Lecture ID (optional)" value={draft.libraryItemId || ''} />
+                <input className="rounded-xl bg-surface-container px-3 py-2 text-xs" min="0" onChange={(event) => updateDraft({ timestampSeconds: event.target.value })} placeholder="Timestamp seconds" type="number" value={draft.timestampSeconds ?? ''} />
+              </div>
               <textarea
                 ref={contentEditorRef}
                 className={`rounded-2xl w-full h-full min-h-[420px] resize-none bg-surface-container-lowest border-0 outline-none p-6 font-headline text-sm leading-7 text-on-background ${

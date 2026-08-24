@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { pool } from '../db/pool.js'
-import { authenticate, requireTrainer } from '../middleware/auth.js'
+import { authenticate, requireAdmin, requireTrainer } from '../middleware/auth.js'
 
 const router = Router()
 
@@ -39,6 +39,13 @@ router.get('/paths/:pathId/gating', async (req, res) => {
     [req.user.id],
   )
   const completedCourses = new Set(progressRows.map((row) => row.room_id))
+
+  const [overrideRows] = await pool.query(
+    `SELECT module_id FROM module_gating_overrides
+     WHERE user_id = ? AND module_id IN (?) AND (expires_at IS NULL OR expires_at > NOW())`,
+    [req.user.id, moduleIds],
+  )
+  const overrides = new Set(overrideRows.map((row) => row.module_id))
 
   const coursesByModule = new Map()
   for (const row of courseRows) {
@@ -80,7 +87,8 @@ router.get('/paths/:pathId/gating', async (req, res) => {
       completedCourses: done,
       isComplete: isModuleComplete(module.id),
       requires: required,
-      locked: outstanding.length > 0,
+      locked: outstanding.length > 0 && !overrides.has(module.id),
+      overridden: overrides.has(module.id),
       blockedBy: outstanding.map(
         (moduleId) => modules.find((row) => row.id === moduleId)?.title || moduleId,
       ),
@@ -90,11 +98,83 @@ router.get('/paths/:pathId/gating', async (req, res) => {
   return res.json({ modules: result })
 })
 
+router.put('/modules/:moduleId/override/:userId', requireAdmin, async (req, res) => {
+  if (req.body?.granted === false) {
+    await pool.query('DELETE FROM module_gating_overrides WHERE module_id=? AND user_id=?', [req.params.moduleId, req.params.userId])
+    return res.json({ granted: false })
+  }
+  await pool.query(
+    `INSERT INTO module_gating_overrides (module_id,user_id,granted_by,reason,expires_at)
+     VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE granted_by=VALUES(granted_by),reason=VALUES(reason),expires_at=VALUES(expires_at)`,
+    [req.params.moduleId, req.params.userId, req.user.id, req.body?.reason || null, req.body?.expiresAt || null],
+  )
+  res.json({ granted: true })
+})
+
+/** Enforces module gates even when a trainee opens a course URL directly. */
+router.get('/courses/:courseId/access', async (req, res) => {
+  const [rooms] = await pool.query('SELECT id FROM rooms WHERE id=? OR slug=? LIMIT 1', [req.params.courseId, req.params.courseId])
+  if (!rooms.length) return res.status(404).json({ message: 'Course not found' })
+  const [modules] = await pool.query(
+    `SELECT module.id,module.title,module.career_path_id,module.sort_order
+     FROM career_path_module_rooms link JOIN career_path_modules module ON module.id=link.module_id
+     WHERE link.room_id=?`, [rooms[0].id])
+  for (const module of modules) {
+    const [override] = await pool.query(`SELECT 1 FROM module_gating_overrides WHERE module_id=? AND user_id=? AND (expires_at IS NULL OR expires_at>NOW()) LIMIT 1`, [module.id, req.user.id])
+    if (override.length) continue
+    let [required] = await pool.query('SELECT requires_module_id id FROM module_prerequisites WHERE module_id=?', [module.id])
+    if (!required.length) {
+      const [previous] = await pool.query('SELECT id FROM career_path_modules WHERE career_path_id=? AND sort_order < ? ORDER BY sort_order DESC LIMIT 1', [module.career_path_id, module.sort_order])
+      required = previous
+    }
+    if (!required.length) continue
+    const ids = required.map((row) => row.id)
+    const [counts] = await pool.query(
+      `SELECT required.id,required.title,COUNT(DISTINCT links.room_id) total,
+              COUNT(DISTINCT CASE WHEN progress.completed_at IS NOT NULL THEN links.room_id END) done
+       FROM career_path_modules required
+       LEFT JOIN career_path_module_rooms links ON links.module_id=required.id
+       LEFT JOIN user_room_progress progress ON progress.room_id=links.room_id AND progress.user_id=?
+       WHERE required.id IN (?) GROUP BY required.id,required.title`, [req.user.id, ids])
+    const blocked = counts.filter((row) => !Number(row.total) || Number(row.done) < Number(row.total))
+    if (blocked.length) return res.json({ allowed: false, moduleId: module.id, moduleTitle: module.title, blockedBy: blocked.map((row) => row.title) })
+  }
+  res.json({ allowed: true })
+})
+
 router.put('/modules/:moduleId/prerequisites', requireTrainer, async (req, res) => {
   const requires = Array.isArray(req.body?.requires) ? req.body.requires : []
 
   if (requires.includes(req.params.moduleId)) {
     return res.status(400).json({ message: 'A module cannot require itself' })
+  }
+
+  const [moduleRows] = await pool.query('SELECT id,career_path_id FROM career_path_modules WHERE id=? LIMIT 1', [req.params.moduleId])
+  if (!moduleRows.length) return res.status(404).json({ message: 'Module not found' })
+  if (requires.length) {
+    const [requiredRows] = await pool.query('SELECT id,career_path_id FROM career_path_modules WHERE id IN (?)', [requires])
+    if (requiredRows.length !== new Set(requires).size || requiredRows.some((row) => row.career_path_id !== moduleRows[0].career_path_id)) {
+      return res.status(400).json({ message: 'Prerequisites must be valid modules in the same learning path' })
+    }
+    const [edges] = await pool.query(
+      `SELECT prerequisite.module_id,prerequisite.requires_module_id
+       FROM module_prerequisites prerequisite
+       JOIN career_path_modules module ON module.id=prerequisite.module_id
+       WHERE module.career_path_id=?`, [moduleRows[0].career_path_id])
+    const graph = new Map()
+    for (const edge of edges) {
+      if (!graph.has(edge.module_id)) graph.set(edge.module_id, [])
+      graph.get(edge.module_id).push(edge.requires_module_id)
+    }
+    const reachesTarget = (start, seen = new Set()) => {
+      if (start === req.params.moduleId) return true
+      if (seen.has(start)) return false
+      seen.add(start)
+      return (graph.get(start) || []).some((next) => reachesTarget(next, seen))
+    }
+    if (requires.some((requiredId) => reachesTarget(requiredId))) {
+      return res.status(400).json({ message: 'These prerequisites would create a progression cycle' })
+    }
   }
 
   const connection = await pool.getConnection()
@@ -188,9 +268,9 @@ router.get('/search', async (req, res) => {
   const like = `%${term}%`
   const perType = Math.min(Number(req.query.limit || 8), 20)
 
-  const [courses, paths, library, resources, assessments, assignments] = await Promise.all([
+  const [courses, paths, modules, library, resources, research, assessments, assignments] = await Promise.all([
     pool.query(
-      `SELECT id, slug, title, description, category FROM rooms
+      `SELECT id, slug, title, description, category, COALESCE(difficulty,level) difficulty FROM rooms
        WHERE title LIKE ? OR description LIKE ? OR category LIKE ? LIMIT ?`,
       [like, like, like, perType],
     ),
@@ -200,14 +280,27 @@ router.get('/search', async (req, res) => {
       [like, like, perType],
     ),
     pool.query(
-      `SELECT id, title, description, subject, item_type FROM trainer_library_items
-       WHERE is_published = true AND (title LIKE ? OR description LIKE ? OR subject LIKE ?) LIMIT ?`,
+      `SELECT m.id,m.title,m.description,m.phase,p.id path_id,p.slug path_slug,p.title path_title
+       FROM career_path_modules m JOIN career_paths p ON p.id=m.career_path_id
+       WHERE m.title LIKE ? OR m.description LIKE ? OR m.phase LIKE ? LIMIT ?`,
+      [like, like, like, perType],
+    ),
+    pool.query(
+      `SELECT item.id, item.title, item.description, item.subject, item.item_type,
+              item.trainer_id, COALESCE(NULLIF(CONCAT_WS(' ',u.first_name,u.last_name),''),u.username) trainer_name
+       FROM trainer_library_items item JOIN users u ON u.id=item.trainer_id
+       WHERE item.is_published = true AND (item.title LIKE ? OR item.description LIKE ? OR item.subject LIKE ?) LIMIT ?`,
       [like, like, like, perType],
     ),
     pool.query(
       `SELECT id, cve_id, short_description FROM cves
        WHERE cve_id LIKE ? OR short_description LIKE ? LIMIT ?`,
       [like, like, perType],
+    ),
+    pool.query(
+      `SELECT id,title,summary description,project_type FROM lab_research_projects
+       WHERE is_active=true AND (title LIKE ? OR summary LIKE ? OR explanation LIKE ?) LIMIT ?`,
+      [like, like, like, perType],
     ),
     pool.query(
       `SELECT id, title, subject FROM assessments
@@ -228,6 +321,7 @@ router.get('/search', async (req, res) => {
       title: row.title,
       subtitle: row.category,
       snippet: row.description,
+      difficulty: row.difficulty,
       link: `/learn/course/${row.slug}`,
       icon: 'school',
     })),
@@ -240,9 +334,16 @@ router.get('/search', async (req, res) => {
       link: `/learn/path/${row.slug}`,
       icon: 'auto_stories',
     })),
+    ...modules[0].map((row) => ({
+      type: 'module', id: row.id, title: row.title,
+      subtitle: `${row.path_title} · ${row.phase || 'Module'}`, snippet: row.description,
+      link: `/learn/path/${row.path_slug || row.path_id}/module/${row.id}`, icon: 'view_agenda',
+    })),
     ...library[0].map((row) => ({
       type: 'library',
       id: row.id,
+      trainerId: row.trainer_id,
+      trainer: row.trainer_name,
       title: row.title,
       subtitle: `${row.subject || 'General'} · ${row.item_type}`,
       snippet: row.description,
@@ -257,6 +358,10 @@ router.get('/search', async (req, res) => {
       snippet: row.short_description,
       link: `/resources/${row.id}`,
       icon: 'menu_book',
+    })),
+    ...research[0].map((row) => ({
+      type: 'research', id: row.id, title: row.title, subtitle: `${row.project_type || 'research'} project`,
+      snippet: row.description, link: `/projects/${row.id}`, icon: 'biotech',
     })),
     ...assessments[0].map((row) => ({
       type: 'assessment',
@@ -280,7 +385,17 @@ router.get('/search', async (req, res) => {
 
   // Exact and prefix matches first, then everything else alphabetically.
   const lowered = term.toLowerCase()
-  results.sort((a, b) => {
+  const typeFilter = String(req.query.type || '').trim()
+  const subjectFilter = String(req.query.subject || req.query.stream || '').trim().toLowerCase()
+  const trainerFilter = String(req.query.trainer || '').trim().toLowerCase()
+  const difficultyFilter = String(req.query.difficulty || '').trim().toLowerCase()
+  const filtered = results.filter((item) =>
+    (!typeFilter || item.type === typeFilter) &&
+    (!subjectFilter || `${item.subtitle || ''} ${item.snippet || ''}`.toLowerCase().includes(subjectFilter)) &&
+    (!trainerFilter || `${item.trainer || ''} ${item.trainerId || ''}`.toLowerCase().includes(trainerFilter)) &&
+    (!difficultyFilter || String(item.difficulty || '').toLowerCase().includes(difficultyFilter)),
+  )
+  filtered.sort((a, b) => {
     const rank = (item) => {
       const title = item.title.toLowerCase()
       if (title === lowered) return 0
@@ -291,7 +406,7 @@ router.get('/search', async (req, res) => {
     return rank(a) - rank(b) || a.title.localeCompare(b.title)
   })
 
-  return res.json({ query: term, count: results.length, results })
+  return res.json({ query: term, count: filtered.length, results: filtered })
 })
 
 /* ------------------------------------------------------- skill gap ------- */
@@ -305,9 +420,24 @@ router.get('/skill-gap', async (req, res) => {
   const targetSubject = req.query.subject ? String(req.query.subject) : null
   const targetPathId = req.query.pathId ? String(req.query.pathId) : null
 
-  const [skillRows] = await pool.query('SELECT skill, proficiency FROM user_skills WHERE user_id = ?', [
-    req.user.id,
-  ])
+  const [skillRows] = await pool.query(
+    `SELECT skill,proficiency FROM user_skills WHERE user_id=?
+     UNION ALL
+     SELECT skill,proficiency FROM skill_evidence
+     WHERE user_id=? AND (expires_at IS NULL OR expires_at>=CURRENT_DATE)
+     UNION ALL
+     SELECT a.subject,'intermediate' FROM assessment_attempts attempt
+     JOIN assessments a ON a.id=attempt.assessment_id WHERE attempt.user_id=? AND attempt.passed=true
+     UNION ALL
+     SELECT a.subject,'intermediate' FROM assignment_submissions submission
+     JOIN assignments a ON a.id=submission.assignment_id WHERE submission.user_id=? AND submission.passed=true
+     UNION ALL
+     SELECT p.title,'intermediate' FROM learning_project_members member
+     JOIN learning_projects p ON p.id=member.project_id WHERE member.user_id=? AND p.status='completed'
+     UNION ALL
+     SELECT job_title,'intermediate' FROM user_work_experience WHERE user_id=?`,
+    [req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id],
+  )
   const mySkills = new Map(
     skillRows.map((row) => [String(row.skill).trim().toLowerCase(), row.proficiency]),
   )

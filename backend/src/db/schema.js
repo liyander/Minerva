@@ -10,6 +10,11 @@ import {
   PLATFORM_TABLE_DDL,
   PLATFORM_TABLES,
 } from './platformSchema.js'
+import {
+  EXPERIENCE_COLUMN_MIGRATIONS,
+  EXPERIENCE_TABLE_DDL,
+  EXPERIENCE_TABLES,
+} from './experienceSchema.js'
 
 // Single source of truth for the database shape. Both the CLI initialiser and
 // the admin "Database" screen build the schema from here, so they can never
@@ -481,6 +486,7 @@ export const EXPECTED_TABLES = [
   ...TRAINING_TABLES,
   ...COMMUNITY_TABLES,
   ...PLATFORM_TABLES,
+  ...EXPERIENCE_TABLES,
 ]
 
 // Additive migrations for databases created by older versions.
@@ -626,11 +632,14 @@ export async function createCoreTables(conn) {
   await migrateLegacyCommunityAssignments(conn)
   // Platform tables depend on assessments and trainer_library_items.
   await conn.query(PLATFORM_TABLE_DDL)
+  // Integrated learning-experience tables depend on platform cohorts/files.
+  await conn.query(EXPERIENCE_TABLE_DDL)
   return (
     CORE_TABLES.length
     + TRAINING_TABLES.length
     + COMMUNITY_TABLES.length
     + PLATFORM_TABLES.length
+    + EXPERIENCE_TABLES.length
   )
 }
 
@@ -641,6 +650,7 @@ export async function applyColumnMigrations(conn) {
     ...COLUMN_MIGRATIONS,
     ...TRAINING_COLUMN_MIGRATIONS,
     ...PLATFORM_COLUMN_MIGRATIONS,
+    ...EXPERIENCE_COLUMN_MIGRATIONS,
   ]) {
     try {
       if (await addColumnIfMissing(conn, table, column, definition)) {
