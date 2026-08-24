@@ -1,0 +1,25 @@
+{
+  "name": "incognitrix-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon --watch src --ext js,json --signal SIGTERM src/index.js",
+    "dev:watch": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "db:init": "node src/db/initDatabase.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.15.2",
+    "openai": "^6.34.0",
+    "ws": "^8.21.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}

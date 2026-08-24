@@ -1,0 +1,95 @@
+import cors from 'cors'
+import express from 'express'
+import { env } from './config/env.js'
+import { databaseErrorMessage, wrapRouterAsync } from './middleware/asyncRouter.js'
+import authRoutes from './routes/auth.routes.js'
+import careerPathRoutes from './routes/careerPaths.routes.js'
+import platformRoutes from './routes/platform.routes.js'
+import roomRoutes from './routes/rooms.routes.js'
+import categoryRoutes from './routes/categories.routes.js'
+import notificationsRoutes from './routes/notifications.routes.js'
+import ctfEventsRoutes from './routes/ctfEvents.routes.js'
+import usersRoutes from './routes/users.routes.js'
+import cvesRoutes from './routes/cves.routes.js'
+import chatbotRoutes from './routes/chatbot.routes.js'
+import adminAiRoutes from './routes/adminAi.routes.js'
+import certificatesRoutes from './routes/certificates.routes.js'
+import notesRoutes from './routes/notes.routes.js'
+import developerRoutes from './routes/developer.routes.js'
+import jobsRoutes from './routes/jobs.routes.js'
+import resumesRoutes from './routes/resumes.routes.js'
+import interviewsRoutes from './routes/interviews.routes.js'
+import labResearchRoutes from './routes/labResearch.routes.js'
+import databaseRoutes from './routes/database.routes.js'
+import profilesRoutes from './routes/profiles.routes.js'
+import assessmentsRoutes from './routes/assessments.routes.js'
+import trainingRoutes from './routes/training.routes.js'
+import adminUsersRoutes from './routes/adminUsers.routes.js'
+import publicApiRoutes from './api/publicApi.routes.js'
+
+const app = express()
+
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin || env.corsOrigins.includes('*') || env.corsOrigins.includes(origin)) {
+      callback(null, true)
+      return
+    }
+
+    callback(new Error(`Origin ${origin} is not allowed by CORS`))
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+}
+
+app.use(cors(corsOptions))
+app.options('*', cors(corsOptions))
+app.use('/api/rooms/:id/docker/proxy', express.raw({ type: '*/*', limit: '50mb' }))
+app.use(express.json({ limit: '50mb' }))
+
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok' })
+})
+
+app.use('/api/auth', authRoutes)
+app.use('/api/rooms', roomRoutes)
+app.use('/api/categories', categoryRoutes)
+app.use('/api/career-paths', careerPathRoutes)
+app.use('/api/platform-config', platformRoutes)
+app.use('/api/notifications', notificationsRoutes)
+app.use('/api/ctf-events', ctfEventsRoutes)
+app.use('/api/users', usersRoutes)
+app.use('/api/cves', cvesRoutes)
+app.use('/api/chatbot', chatbotRoutes)
+app.use('/api/admin-ai', adminAiRoutes)
+app.use('/api/certificates', certificatesRoutes)
+app.use('/api/notes', notesRoutes)
+app.use('/api/developer', developerRoutes)
+app.use('/api/jobs', jobsRoutes)
+app.use('/api/resumes', resumesRoutes)
+app.use('/api/interviews', interviewsRoutes)
+app.use('/api/lab-research', labResearchRoutes)
+app.use('/api/database', databaseRoutes)
+app.use('/api/profiles', profilesRoutes)
+app.use('/api/assessments', assessmentsRoutes)
+app.use('/api/training', trainingRoutes)
+app.use('/api/admin', adminUsersRoutes)
+app.use('/api/public', publicApiRoutes)
+
+// Async handlers reject rather than throw synchronously; wrapping every mounted
+// router routes those rejections here instead of crashing the process.
+wrapRouterAsync(app._router)
+
+app.use((err, _req, res, _next) => {
+  console.error(err)
+
+  const mapped = databaseErrorMessage(err)
+  if (mapped) {
+    return res.status(mapped.status).json({ message: mapped.message })
+  }
+
+  return res.status(500).json({ message: 'Internal server error' })
+})
+
+export default app

@@ -1,0 +1,142 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  /* Soft, light learning-platform palette: warm cocoa accent on cool paper. */
+  --color-surface: #f6f7fb;
+  --color-background: #eef0f6;
+  --color-on-background: #1b2233;
+  --color-on-surface: #1b2233;
+  --color-on-surface-variant: #6b7488;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #fbfbfe;
+  --color-surface-container: #f2f4f9;
+  --color-surface-container-high: #e9ecf4;
+  --color-surface-container-highest: #e1e5ef;
+  --color-surface-variant: #eaedf4;
+  --color-outline: #a8b0c1;
+  --color-outline-variant: #e3e7ef;
+  --color-primary: #6d3a17;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #f7e7d8;
+  --color-on-primary-container: #4a2409;
+  --color-secondary: #6d55e0;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #ebe6ff;
+  --color-on-secondary-container: #35279a;
+  --color-tertiary: #0f9b76;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #d7f4e8;
+  --color-on-tertiary-container: #08543f;
+  --color-error: #d0453f;
+  --color-on-error: #ffffff;
+  --color-error-container: #fde4e2;
+  --color-on-error-container: #8c1f1b;
+  --color-inverse-surface: #262d3c;
+  --color-inverse-on-surface: #f2f4f9;
+  --color-surface-tint: #6d3a17;
+
+  /* Pastel card accents lifted from the reference dashboard. */
+  --accent-mint: #d9f3e6;
+  --accent-on-mint: #0d6b50;
+  --accent-lavender: #f4e6fa;
+  --accent-on-lavender: #6b2b8f;
+  --accent-sky: #e2eefb;
+  --accent-on-sky: #1c5a99;
+  --accent-butter: #fdeec5;
+  --accent-on-butter: #8a6108;
+  --accent-blush: #fde4ef;
+  --accent-on-blush: #a92468;
+
+  --neutral-50: 250 250 250;
+  --neutral-100: 245 245 245;
+  --neutral-200: 229 229 229;
+  --neutral-300: 212 212 212;
+  --neutral-400: 163 163 163;
+  --neutral-500: 115 115 115;
+  --neutral-600: 82 82 82;
+  --neutral-700: 64 64 64;
+  --neutral-800: 38 38 38;
+  --neutral-900: 23 23 23;
+  --neutral-950: 10 10 10;
+}
+
+html.dark {
+  /* Same soft geometry, dimmed to a teal-tinted charcoal. */
+  --color-surface: #12201f;
+  --color-background: #0b1615;
+  --color-on-background: #e6f3f1;
+  --color-on-surface: #e6f3f1;
+  --color-on-surface-variant: #9ab5b1;
+  --color-surface-container-lowest: #162523;
+  --color-surface-container-low: #1a2b29;
+  --color-surface-container: #1f3230;
+  --color-surface-container-high: #263c39;
+  --color-surface-container-highest: #2f4744;
+  --color-surface-variant: #233835;
+  --color-outline: #567571;
+  --color-outline-variant: #2d4643;
+  --color-primary: #2ed3bb;
+  --color-on-primary: #00332c;
+  --color-primary-container: #14564d;
+  --color-on-primary-container: #b6f5ea;
+  --color-secondary: #5fc9e8;
+  --color-on-secondary: #003544;
+  --color-secondary-container: #17505f;
+  --color-on-secondary-container: #c3edfb;
+  --color-tertiary: #8fdcae;
+  --color-on-tertiary: #003821;
+  --color-tertiary-container: #1c5537;
+  --color-on-tertiary-container: #c8f5da;
+  --color-error: #ff8b83;
+  --color-on-error: #4d0f0c;
+  --color-error-container: #5f2320;
+  --color-on-error-container: #ffdedb;
+  --color-inverse-surface: #e6f3f1;
+  --color-inverse-on-surface: #0b1615;
+  --color-surface-tint: #2ed3bb;
+
+  --accent-mint: #10493e;
+  --accent-on-mint: #7cf0da;
+  --accent-lavender: #3a2d5c;
+  --accent-on-lavender: #cbb8fa;
+  --accent-sky: #103a58;
+  --accent-on-sky: #93cdf7;
+  --accent-butter: #4d4118;
+  --accent-on-butter: #f5dd93;
+  --accent-blush: #55253e;
+  --accent-on-blush: #fab6d3;
+
+  --neutral-50: 38 38 38;
+  --neutral-100: 46 46 46;
+  --neutral-200: 64 64 64;
+  --neutral-300: 82 82 82;
+  --neutral-400: 115 115 115;
+  --neutral-500: 163 163 163;
+  --neutral-600: 212 212 212;
+  --neutral-700: 229 229 229;
+  --neutral-800: 245 245 245;
+  --neutral-900: 250 250 250;
+  --neutral-950: 255 255 255;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-background);
+  color: var(--color-on-background);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Keep legacy light-hover utility classes readable in dark mode. */
+html.dark .hover\:bg-white:hover {
+  background-color: var(--color-surface-container-high) !important;
+}
+
+html.dark .hover\:bg-neutral-100:hover {
+  background-color: var(--color-surface-container-high) !important;
+}
+
+html.dark .hover\:text-neutral-900:hover {
+  color: var(--color-on-surface) !important;
+}

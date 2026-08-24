@@ -1,0 +1,1 @@
+The user area did not show the CVEs because the MySQL backend was omitting the cves table on existing databases. The app then failed the syncing step across window tabs. Additionally, the Mobile Sidebar link was omitted.
