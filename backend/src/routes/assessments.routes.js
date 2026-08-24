@@ -113,19 +113,31 @@ router.get('/target-users', requireTrainer, async (req, res) => {
 router.post('/ai/generate', requireTrainer, async (req, res) => {
   const subject = String(req.body?.subject || '').trim(), topic = String(req.body?.topic || subject).trim()
   const count = Math.min(20, Math.max(1, Number(req.body?.count || 5))), difficulty = String(req.body?.difficulty || 'medium')
+  const kind = ['quiz', 'coding', 'combined'].includes(req.body?.kind) ? req.body.kind : 'quiz'
   if (!subject) return res.status(400).json({ message: 'Choose a subject before generating questions' })
-  const fallback = Array.from({ length: count }, (_, index) => ({ questionType: 'single_choice', difficulty,
+  const codingFallback = (index) => ({ questionType: 'coding', difficulty,
+    prompt: `${topic}: implement solve(input) for coding problem ${index + 1}. Edit the statement, constraints, and tests before publishing.`,
+    options: [], starterCode: 'function solve(input) {\n  // Return your answer\n}\n', solutionCode: '', marks: 10,
+    settings: { inputFormat: 'JSON value', outputFormat: 'Return value', constraints: [] },
+    testCases: [{ input: '1', expectedOutput: '1', hidden: false, marks: 4 }, { input: '2', expectedOutput: '2', hidden: true, marks: 6 }] })
+  const quizFallback = (index) => ({ questionType: 'single_choice', difficulty,
     prompt: `${topic}: generated practice question ${index + 1}`, options: ['Option A', 'Option B', 'Option C', 'Option D'],
-    correctIndex: 0, explanation: 'Edit this generated draft and confirm the correct answer.', marks: 1 }))
+    correctIndex: 0, explanation: 'Edit this generated draft and confirm the correct answer.', marks: 1 })
+  const fallback = Array.from({ length: count }, (_, index) => kind === 'coding' ? codingFallback(index) : quizFallback(index))
   const config = await getAiRuntimeConfig()
   if (!config.apiKey) return res.json({ questions: fallback, generatedBy: 'template' })
   try {
     const client = new OpenAI({ baseURL: config.baseUrl, apiKey: config.apiKey })
     const response = await client.chat.completions.create({ model: config.model, temperature: Number(config.temperature || 0.5), max_tokens: Math.min(10000, count * 700), stream: false,
-      messages: [{ role: 'system', content: 'Return strict JSON only: {"questions":[{"questionType":"single_choice|multiple_choice|true_false|fill_blank|short_answer|long_answer|scenario|reasoning|output_prediction|bug_finding|code_analysis|security_scenario","difficulty":"easy|medium|hard","prompt":"string","options":["string"],"correctIndex":0,"correctAnswer":[],"explanation":"string","marks":1}]}. Produce accurate, varied assessment questions. Multiple-choice correctAnswer contains zero-based indexes. Fill-blank correctAnswer contains accepted strings.' },
-        { role: 'user', content: `Create ${count} ${difficulty} questions for subject ${subject}, topic ${topic}.` }] })
+      messages: [{ role: 'system', content: 'Return strict JSON only: {"questions":[{"questionType":"single_choice|multiple_choice|true_false|fill_blank|short_answer|long_answer|scenario|reasoning|output_prediction|bug_finding|code_analysis|security_scenario|coding","difficulty":"easy|medium|hard","prompt":"complete problem statement","options":["string"],"correctIndex":0,"correctAnswer":[],"explanation":"string","starterCode":"function solve(input) {}","solutionCode":"string","settings":{"inputFormat":"string","outputFormat":"string","constraints":["string"]},"testCases":[{"input":"valid JSON or string","expectedOutput":"string","hidden":false,"marks":1}],"marks":1}]}. For coding questions include at least two valid test cases, one hidden, and no answer options. Multiple-choice correctAnswer contains zero-based indexes. Fill-blank correctAnswer contains accepted strings.' },
+        { role: 'user', content: `Create ${count} ${difficulty} ${kind} assessment questions for subject ${subject}, topic ${topic}. ${kind === 'coding' ? 'Every question must have questionType coding.' : kind === 'quiz' ? 'Do not create coding questions.' : 'Mix objective, descriptive, and coding questions.'}` }] })
     const raw = String(response.choices?.[0]?.message?.content || '').replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim()
-    const parsed = JSON.parse(raw), questions = Array.isArray(parsed.questions) ? parsed.questions.slice(0, count) : []
+    const parsed = JSON.parse(raw), generated = Array.isArray(parsed.questions) ? parsed.questions.slice(0, count) : []
+    const questions = generated.map((question, index) => {
+      if (kind !== 'coding') return question
+      return { ...codingFallback(index), ...question, questionType: 'coding', options: [],
+        testCases: Array.isArray(question.testCases) && question.testCases.length ? question.testCases : codingFallback(index).testCases }
+    })
     return res.json({ questions: questions.length ? questions : fallback, generatedBy: questions.length ? 'ai' : 'template' })
   } catch { return res.json({ questions: fallback, generatedBy: 'template' }) }
 })
@@ -173,10 +185,10 @@ router.delete('/:id', requireTrainer, async (req,res) => { const row=await getAs
 router.put('/:id/questions', requireTrainer, async (req,res) => {
   const row=await getAssessment(req.params.id); if(!row)return res.status(404).json({message:'Assessment not found'}); if(!canManage(req.user,row))return res.status(403).json({message:'You can only edit your own assessments'})
   const questions=Array.isArray(req.body?.questions)?req.body.questions:[]
-  for(const [i,q] of questions.entries()) { const type=TYPES.has(q.questionType)?q.questionType:'single_choice'; if(!String(q.prompt||'').trim())return res.status(400).json({message:`Question ${i+1} needs a prompt`}); if(CHOICE_TYPES.has(type)&&parseJson(q.options,[]).filter(Boolean).length<2)return res.status(400).json({message:`Question ${i+1} needs at least two options`}); if(type==='coding'&&!(q.testCases||[]).length)return res.status(400).json({message:`Coding question ${i+1} needs a test case`}) }
+  for(const [i,q] of questions.entries()) { const type=row.kind==='coding'?'coding':TYPES.has(q.questionType)?q.questionType:'single_choice'; if(!String(q.prompt||'').trim())return res.status(400).json({message:`Question ${i+1} needs a prompt`}); if(CHOICE_TYPES.has(type)&&parseJson(q.options,[]).filter(Boolean).length<2)return res.status(400).json({message:`Question ${i+1} needs at least two options`}); if(type==='coding'&&!(q.testCases||[]).length)return res.status(400).json({message:`Coding question ${i+1} needs a test case`}) }
   const conn=await pool.getConnection()
   try { await conn.beginTransaction(); await conn.query('DELETE FROM assessment_questions WHERE assessment_id=?',[row.id]); let total=0
-    for(const [i,q] of questions.entries()) { const type=TYPES.has(q.questionType)?q.questionType:'single_choice', options=parseJson(q.options,[]).map(String).map((v)=>v.trim()).filter(Boolean), marks=Number(q.marks||1); total+=marks
+    for(const [i,q] of questions.entries()) { const type=row.kind==='coding'?'coding':TYPES.has(q.questionType)?q.questionType:'single_choice', options=parseJson(q.options,[]).map(String).map((v)=>v.trim()).filter(Boolean), marks=Number(q.marks||1); total+=marks
       const [insert]=await conn.query(`INSERT INTO assessment_questions (assessment_id,prompt,question_type,difficulty,options_json,correct_index,correct_answer_json,explanation,settings_json,starter_code,solution_code,marks,sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,[row.id,String(q.prompt).trim(),type,q.difficulty||'medium',JSON.stringify(options),Number(q.correctIndex||0),q.correctAnswer==null?null:JSON.stringify(q.correctAnswer),q.explanation||null,JSON.stringify(q.settings||{}),q.starterCode||null,q.solutionCode||null,marks,i])
       for(const [j,test] of (q.testCases||[]).entries()) await conn.query('INSERT INTO assessment_test_cases (question_id,input_data,expected_output,is_hidden,marks,sort_order) VALUES (?,?,?,?,?,?)',[insert.insertId,String(test.input??''),String(test.expectedOutput??''),Boolean(test.hidden),Number(test.marks||1),j])
     }

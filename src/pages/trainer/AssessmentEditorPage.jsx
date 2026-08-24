@@ -13,8 +13,8 @@ import {
 import { fetchQuestionBanks } from '../../services/platform'
 import { fetchClassrooms } from '../../services/community'
 
-const emptyQuestion = () => ({
-  questionType: 'single_choice',
+const emptyQuestion = (kind = 'quiz') => ({
+  questionType: kind === 'coding' ? 'coding' : 'single_choice',
   difficulty: 'medium',
   prompt: '',
   options: ['', '', '', ''],
@@ -130,7 +130,7 @@ function AssessmentEditorPage() {
         assessment.questions?.length
           ? assessment.questions.map((question) => ({
               prompt: question.prompt,
-              questionType: question.questionType || 'single_choice', difficulty: question.difficulty || 'medium',
+              questionType: assessment.kind === 'coding' ? 'coding' : question.questionType || 'single_choice', difficulty: question.difficulty || 'medium',
               options: question.options.length ? question.options : ['', ''],
               correctIndex: question.correctIndex ?? 0,
               explanation: question.explanation || '',
@@ -348,7 +348,7 @@ function AssessmentEditorPage() {
           </label>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <label><span className="font-headline text-xs font-bold text-on-surface-variant">Assessment type</span><select className={fieldClass} onChange={(e) => setForm((f) => ({ ...f, kind: e.target.value }))} value={form.kind}><option value="quiz">Quiz</option><option value="coding">Coding</option><option value="combined">Combined</option></select></label>
+            <label><span className="font-headline text-xs font-bold text-on-surface-variant">Assessment type</span><select className={fieldClass} onChange={(e) => { const kind=e.target.value; setForm((f) => ({ ...f, kind })); if(kind==='coding')setQuestions((current)=>current.map((question)=>question.questionType==='coding'?question:{...emptyQuestion('coding'),prompt:question.prompt,explanation:question.explanation,difficulty:question.difficulty})) }} value={form.kind}><option value="quiz">Quiz</option><option value="coding">Coding</option><option value="combined">Combined</option></select></label>
             <label><span className="font-headline text-xs font-bold text-on-surface-variant">Difficulty</span><select className={fieldClass} onChange={(e) => setForm((f) => ({ ...f, difficulty: e.target.value }))} value={form.difficulty}><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select></label>
             <label><span className="font-headline text-xs font-bold text-on-surface-variant">Creation method</span><select className={fieldClass} onChange={(e) => setForm((f) => ({ ...f, creationMethod: e.target.value }))} value={form.creationMethod}><option value="manual">Manual</option><option value="ai_edit">AI + edit</option></select></label>
           </div>
@@ -462,12 +462,12 @@ function AssessmentEditorPage() {
             </h2>
             <button
               className={`${pill} bg-surface-container-high text-on-surface`}
-              onClick={() => setQuestions((current) => [...current, emptyQuestion()])}
+              onClick={() => setQuestions((current) => [...current, emptyQuestion(form.kind)])}
               type="button"
             >
               Add question
             </button>
-            <button className={`${pill} bg-lavender text-on-lavender`} onClick={async()=>{if(!form.subject){setError('Choose a subject before using AI.');return}setIsSaving(true);setError('');try{const output=await generateAssessmentQuestions({subject:form.subject,topic:form.title,difficulty:form.difficulty,count:5});setQuestions(output.questions.map((question)=>({...emptyQuestion(),...question,options:question.options?.length?question.options:['','']})));setForm((current)=>({...current,creationMethod:'ai_edit'}));setNotice(output.generatedBy==='ai'?'AI draft generated. Review every answer before publishing.':'Draft templates generated because no AI provider was available.')}catch(e){setError(e.message)}finally{setIsSaving(false)}}} type="button">Generate with AI</button>
+            <button className={`${pill} bg-lavender text-on-lavender`} onClick={async()=>{if(!form.subject){setError('Choose a subject before using AI.');return}setIsSaving(true);setError('');try{const output=await generateAssessmentQuestions({subject:form.subject,topic:form.title,difficulty:form.difficulty,kind:form.kind,count:5});setQuestions(output.questions.map((question)=>({...emptyQuestion(form.kind),...question,questionType:form.kind==='coding'?'coding':question.questionType,options:form.kind==='coding'?[]:question.options?.length?question.options:['','']})));setForm((current)=>({...current,creationMethod:'ai_edit'}));setNotice(output.generatedBy==='ai'?'AI draft generated. Review every answer before publishing.':'Draft templates generated because no AI provider was available.')}catch(e){setError(e.message)}finally{setIsSaving(false)}}} type="button">Generate with AI</button>
           </div>
 
           {questions.map((question, index) => (
@@ -491,7 +491,7 @@ function AssessmentEditorPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <label><span className="font-headline text-xs font-bold text-on-surface-variant">Question type</span><select className={fieldClass} onChange={(e)=>updateQuestion(index,{questionType:e.target.value,options:e.target.value==='true_false'?['True','False']:question.options})} value={question.questionType}><option value="single_choice">Single choice</option><option value="multiple_choice">Multiple choice</option><option value="true_false">True / false</option><option value="fill_blank">Fill in blank</option><option value="short_answer">Short answer</option><option value="long_answer">Long answer</option><option value="scenario">Scenario / reasoning</option><option value="output_prediction">Output prediction</option><option value="ordering">Ordering</option><option value="bug_finding">Bug finding</option><option value="code_analysis">Code analysis</option><option value="security_scenario">Security scenario</option><option value="coding">Coding problem</option></select></label>
+                <label><span className="font-headline text-xs font-bold text-on-surface-variant">Question type</span><select className={fieldClass} disabled={form.kind==='coding'} onChange={(e)=>updateQuestion(index,{questionType:e.target.value,options:e.target.value==='true_false'?['True','False']:question.options})} value={question.questionType}>{form.kind!=='coding'?<><option value="single_choice">Single choice</option><option value="multiple_choice">Multiple choice</option><option value="true_false">True / false</option><option value="fill_blank">Fill in blank</option><option value="short_answer">Short answer</option><option value="long_answer">Long answer</option><option value="scenario">Scenario / reasoning</option><option value="output_prediction">Output prediction</option><option value="ordering">Ordering</option><option value="bug_finding">Bug finding</option><option value="code_analysis">Code analysis</option><option value="security_scenario">Security scenario</option></>:null}<option value="coding">Coding problem</option></select></label>
                 <label><span className="font-headline text-xs font-bold text-on-surface-variant">Difficulty</span><select className={fieldClass} onChange={(e)=>updateQuestion(index,{difficulty:e.target.value})} value={question.difficulty}><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select></label>
               </div>
 
