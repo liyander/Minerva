@@ -140,3 +140,24 @@ html.dark .hover\:bg-neutral-100:hover {
 html.dark .hover\:text-neutral-900:hover {
   color: var(--color-on-surface) !important;
 }
+
+/* Hide Google Translate UI completely */
+body {
+    top: 0px !important;
+    position: static !important;
+}
+.goog-te-banner-frame,
+.skiptranslate iframe,
+#goog-gt-tt,
+.goog-te-balloon-frame,
+.goog-tooltip,
+.goog-tooltip:hover,
+.VIpgJd-ZVi9od-ORHb-OEVmcd,
+.VIpgJd-ZVi9od-aZ2wEe-wOHMyf {
+    display: none !important;
+    visibility: hidden !important;
+}
+.goog-text-highlight {
+    background-color: transparent !important;
+    box-shadow: none !important;
+}

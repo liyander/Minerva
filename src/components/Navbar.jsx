@@ -13,6 +13,8 @@ function Navbar({ config, isSidebarOpen, onLogout, onToggleSidebar }) {
   const notificationsRef = useRef(null)
   const [streak, setStreak] = useState({ currentStreak: 0 })
   const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false)
+  const [showLanguageMenu, setShowLanguageMenu] = useState(false)
+  const languageRef = useRef(null)
 
   const navItemClass = ({ isActive }) =>
     `transition-colors duration-200 ${
@@ -102,11 +104,116 @@ function Navbar({ config, isSidebarOpen, onLogout, onToggleSidebar }) {
       if (notificationsRef.current && !notificationsRef.current.contains(e.target)) {
         setShowNotifications(false)
       }
+      if (languageRef.current && !languageRef.current.contains(e.target)) {
+        setShowLanguageMenu(false)
+      }
     }
 
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+
+  const handleLanguageChange = (langCode) => {
+    const select = document.querySelector('.goog-te-combo')
+    if (select) {
+      select.value = langCode
+      select.dispatchEvent(new Event('change'))
+    }
+    setShowLanguageMenu(false)
+  }
+
+  const languages = [
+    { code: 'en', name: 'English' },
+    { code: 'hi', name: 'Hindi (हिन्दी)' },
+    { code: 'bn', name: 'Bengali (বাংলা)' },
+    { code: 'te', name: 'Telugu (తెలుగు)' },
+    { code: 'mr', name: 'Marathi (मराठी)' },
+    { code: 'ta', name: 'Tamil (தமிழ்)' },
+    { code: 'gu', name: 'Gujarati (ગુજરાતી)' },
+    { code: 'kn', name: 'Kannada (ಕನ್ನಡ)' },
+    { code: 'ml', name: 'Malayalam (മലയാളം)' },
+    { code: 'pa', name: 'Punjabi (ਪੰਜਾਬੀ)' },
+    { code: 'or', name: 'Odia (ଓଡ଼ିଆ)' },
+    { code: 'as', name: 'Assamese (অসমীয়া)' },
+    { code: 'ur', name: 'Urdu (اردو)' }
+  ]
+
+  const handleSearch = (value) => {
+    setSearchQuery(value)
+    
+    if (!value.trim()) {
+      setSearchResults([])
+      setShowResults(false)
+      return
+    }
+
+    const query = value.trim().toLowerCase()
+    const careerPaths = getCareerPathsData()
+    const rooms = getCoursesData()
+
+    const results = []
+
+    // Search in career paths
+    careerPaths.forEach((path) => {
+      if (searchableValue(path.title).includes(query) || searchableValue(path.description).includes(query)) {
+        results.push({
+          type: 'path',
+          id: path.id,
+          title: path.title,
+          description: path.description,
+          icon: 'school',
+        })
+      }
+
+      // Search in modules
+      if (path.modules) {
+        path.modules.forEach((module) => {
+          if (searchableValue(module.title).includes(query) || searchableValue(module.description).includes(query)) {
+            results.push({
+              type: 'module',
+              id: module.id,
+              pathId: path.id,
+              title: module.title,
+              description: module.description,
+              icon: 'layers',
+              pathTitle: path.title,
+            })
+          }
+        })
+      }
+    })
+
+    // Search in rooms
+    rooms.forEach((room) => {
+      if (searchableValue(room.title).includes(query) || searchableValue(room.description).includes(query)) {
+        results.push({
+          type: 'room',
+          id: room.id,
+          slug: room.slug,
+          title: room.title,
+          description: room.description,
+          icon: 'flag',
+        })
+      }
+    })
+
+    setSearchResults(results.slice(0, 8))
+    setShowResults(true)
+  }
+
+  const handleSelectResult = (result) => {
+    if (result.type === 'path') {
+      navigate(`/learn/path/${result.id}`)
+    } else if (result.type === 'module') {
+      navigate(`/learn/path/${result.pathId}/module/${result.id}`)
+    } else if (result.type === 'room') {
+      navigate(`/learn/lesson/${result.slug}`)
+    }
+    setSearchQuery('')
+    setShowResults(false)
+  }
+
 
   return (
     <>
@@ -233,6 +340,36 @@ function Navbar({ config, isSidebarOpen, onLogout, onToggleSidebar }) {
               )}
             </div>
           ) : null}
+          <div ref={languageRef} className="relative hidden sm:block">
+            <button
+              type="button"
+              onClick={() => setShowLanguageMenu(!showLanguageMenu)}
+              className="relative hover:text-on-surface transition-colors inline-flex items-center justify-center mt-1"
+              title="Translate"
+            >
+              <span className="material-symbols-outlined">language</span>
+            </button>
+
+            {showLanguageMenu && (
+              <div className="absolute top-full mt-3 right-0 w-40 bg-surface-container-lowest border border-primary/20 rounded-xl shadow-2xl z-50 overflow-hidden backdrop-blur-sm">
+                <div className="rounded-xl px-3 py-2 border-b border-primary/10 bg-primary/5">
+                  <p className="text-[11px] font-headline font-bold text-primary uppercase tracking-wider">Language</p>
+                </div>
+                <div className="max-h-64 overflow-y-auto py-1 divide-y divide-primary/5">
+                  {languages.map((lang) => (
+                    <button
+                      key={lang.code}
+                      onClick={() => handleLanguageChange(lang.code)}
+                      className="w-full text-left px-4 py-2 hover:bg-primary/8 transition-colors text-xs font-headline font-semibold text-on-surface-variant hover:text-primary"
+                      type="button"
+                    >
+                      {lang.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
           {config.features.navbarSettings ? (
             <button
               className="inline-flex items-center justify-center hover:text-on-surface transition-colors"
