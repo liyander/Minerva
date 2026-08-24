@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import './App.css'
 import { getAuthSession, hasRole, logoutUser, ROLES } from './auth'
 import Navbar from './components/Navbar'
@@ -103,6 +103,7 @@ function firstEnabledRoute(config) {
 }
 
 function App() {
+  const navigate = useNavigate()
   const [authSession, setAuthSession] = useState(getAuthSession)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [platformConfig, setPlatformConfig] = useState(loadPlatformConfig)
@@ -132,10 +133,12 @@ function App() {
     </button>
   )
 
-  const handleSessionExpired = () => {
+  const handleLogout = useCallback(() => {
     logoutUser()
     setAuthSession(null)
-  }
+    navigate('/login', { replace: true })
+  }, [navigate])
+  const handleSessionExpired = handleLogout
 
   const isAuthError = (error) =>
     /invalid or expired token|unauthorized/i.test(error?.message || '')
@@ -149,7 +152,7 @@ function App() {
     return () => {
       window.removeEventListener('incognitrix:auth-expired', onAuthExpired)
     }
-  }, [])
+  }, [handleSessionExpired])
 
   useEffect(() => {
     let cancelled = false
@@ -187,7 +190,7 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [authSession])
+  }, [authSession, handleSessionExpired])
 
   useEffect(() => {
     if (!authSession?.token) {
@@ -227,7 +230,7 @@ function App() {
       cancelled = true
       window.clearInterval(intervalId)
     }
-  }, [authSession?.token])
+  }, [authSession?.token, handleSessionExpired])
 
   const updatePlatformConfig = (nextConfig) => {
     const merged = savePlatformConfig(nextConfig)
@@ -331,10 +334,7 @@ function App() {
               <AdminPanelPage
                 config={platformConfig}
                 onConfigChange={updatePlatformConfig}
-                onLogout={() => {
-                  logoutUser()
-                  setAuthSession(null)
-                }}
+                onLogout={handleLogout}
                 username={authSession.username}
               />
             }
@@ -395,10 +395,7 @@ function App() {
           <Navbar
             config={platformConfig}
             isSidebarOpen={isSidebarOpen}
-            onLogout={() => {
-              logoutUser()
-              setAuthSession(null)
-            }}
+            onLogout={handleLogout}
             onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
           />
           <Routes>
@@ -473,10 +470,7 @@ function App() {
         <Navbar
           config={platformConfig}
           isSidebarOpen={isSidebarOpen}
-          onLogout={() => {
-            logoutUser()
-            setAuthSession(null)
-          }}
+          onLogout={handleLogout}
           onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
         />
         <Routes>
