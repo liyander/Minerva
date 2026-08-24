@@ -29,12 +29,14 @@ export const COMMUNITY_TABLE_DDL = `
   CREATE TABLE IF NOT EXISTS community_channels (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     classroom_id BIGINT NULL,
+    scope_classroom_id BIGINT GENERATED ALWAYS AS (IFNULL(classroom_id, 0)) STORED,
     name VARCHAR(80) NOT NULL,
     topic VARCHAR(255),
     kind VARCHAR(20) NOT NULL DEFAULT 'general',
     created_by INT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_channel_classroom (classroom_id),
+    UNIQUE KEY uniq_channel_scope_name (scope_classroom_id, name),
     FOREIGN KEY (classroom_id) REFERENCES classrooms(id) ON DELETE CASCADE,
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
   );

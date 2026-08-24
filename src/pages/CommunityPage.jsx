@@ -513,7 +513,7 @@ function ChatPanel({ channel, messages, currentUserId, isLoading, onSend, onOpen
   )
 }
 
-function ThreadPanel({ channel, threadData, isLoading, currentUserId, onClose, onSend, onToggleReaction, onDelete, onEdit }) {
+function ThreadPanel({ channel, threadData, isLoading, currentUserId, canModerate, onClose, onSend, onToggleReaction, onDelete, onEdit }) {
   const scrollRef = useRef(null)
 
   useEffect(() => {
@@ -527,13 +527,27 @@ function ThreadPanel({ channel, threadData, isLoading, currentUserId, onClose, o
           <p className="font-headline text-sm font-extrabold text-on-surface">Thread</p>
           <p className="font-body text-xs text-on-surface-variant">#{channel?.name}</p>
         </div>
-        <button
-          className="w-8 h-8 rounded-full hover:bg-surface-container-high inline-flex items-center justify-center"
-          onClick={onClose}
-          type="button"
-        >
-          <span className="material-symbols-outlined text-base">close</span>
-        </button>
+        <div className="flex items-center gap-1">
+          {threadData?.root && !threadData.root.deleted && (canModerate || threadData.root.author?.id === currentUserId) ? (
+            <button
+              className="w-8 h-8 rounded-full text-error hover:bg-error/10 inline-flex items-center justify-center"
+              onClick={() => {
+                if (window.confirm('Delete this thread and all of its replies?')) void onDelete(threadData.root.id)
+              }}
+              title="Delete thread"
+              type="button"
+            >
+              <span className="material-symbols-outlined text-base">delete</span>
+            </button>
+          ) : null}
+          <button
+            className="w-8 h-8 rounded-full hover:bg-surface-container-high inline-flex items-center justify-center"
+            onClick={onClose}
+            type="button"
+          >
+            <span className="material-symbols-outlined text-base">close</span>
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-3" ref={scrollRef}>
@@ -1206,6 +1220,20 @@ function CommunityPage() {
     })
   }, [])
 
+  const applyThreadDeleted = useCallback((messageId) => {
+    setMessages((current) =>
+      current.map((item) =>
+        item.id === messageId
+          ? { ...item, deleted: true, body: '', replyCount: 0, lastReplyAt: null }
+          : item,
+      ),
+    )
+    if (threadMessageIdRef.current === messageId) {
+      setThreadMessage(null)
+      setThreadData(null)
+    }
+  }, [])
+
   useEffect(() => {
     const socket = connectCommunitySocket({
       onMessage: (payload) => {
@@ -1214,11 +1242,12 @@ function CommunityPage() {
         if (payload.type === 'message.created') applyMessageCreated(payload.message)
         if (payload.type === 'message.updated') applyMessageUpdate(payload.message)
         if (payload.type === 'message.deleted') applyMessageDeleted(payload.messageId)
+        if (payload.type === 'thread.deleted') applyThreadDeleted(payload.messageId)
       },
     })
     socketRef.current = socket
     return () => socket.close()
-  }, [applyMessageCreated, applyMessageDeleted, applyMessageUpdate])
+  }, [applyMessageCreated, applyMessageDeleted, applyMessageUpdate, applyThreadDeleted])
 
   const loadChannelsForSpace = useCallback(async (nextSpace) => {
     const classroomId = nextSpace.type === 'classroom' ? nextSpace.id : undefined
@@ -1301,8 +1330,11 @@ function CommunityPage() {
   }
 
   const handleDelete = async (messageId) => {
+    const isThreadRoot = messages.some((message) => message.id === messageId)
+      || threadData?.root?.id === messageId
     await deleteMessage(messageId)
-    applyMessageDeleted(messageId)
+    if (isThreadRoot) applyThreadDeleted(messageId)
+    else applyMessageDeleted(messageId)
   }
 
   const handleDeleteChannel = async (channel) => {
@@ -1511,6 +1543,7 @@ function CommunityPage() {
                   />
                   {threadMessage ? (
                     <ThreadPanel
+                      canModerate={canModerate}
                       channel={selectedChannel}
                       currentUserId={currentUserId}
                       isLoading={isThreadLoading}

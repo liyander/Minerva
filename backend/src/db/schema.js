@@ -373,10 +373,23 @@ export const CORE_TABLE_DDL = `
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS top_player_resumes (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL UNIQUE,
+      file_name VARCHAR(255) NOT NULL,
+      mime_type VARCHAR(160) NOT NULL,
+      file_size INT NOT NULL DEFAULT 0,
+      file_data LONGTEXT NOT NULL,
+      uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      CONSTRAINT fk_top_player_resumes_user
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
   `
 
-// Tables created lazily by feature routes the first time they are used. The
-// admin migrate action creates them up front instead.
+// Feature tables included in schema readiness checks. Most are also created
+// lazily by their routes; top_player_resumes is provisioned during startup.
 export const FEATURE_TABLES = [
   'job_listings',
   'student_career_profiles',
@@ -488,6 +501,7 @@ const COLUMN_MIGRATIONS = [
   ['community_messages', 'attachment_type', 'VARCHAR(120) NULL'],
   ['community_messages', 'attachment_size', 'INT DEFAULT 0'],
   ['community_messages', 'attachment_data', 'LONGTEXT NULL'],
+  ['community_channels', 'scope_classroom_id', 'BIGINT GENERATED ALWAYS AS (IFNULL(classroom_id, 0)) STORED'],
 ]
 
 async function addColumnIfMissing(conn, tableName, columnName, definitionSql) {
@@ -512,12 +526,65 @@ export async function createDatabaseIfMissing(conn) {
   await conn.query(`USE \`${env.db.database}\``)
 }
 
+async function tableHasColumn(conn, tableName, columnName) {
+  const [rows] = await conn.query(
+    `SELECT 1 FROM information_schema.columns
+     WHERE table_schema = ? AND table_name = ? AND column_name = ? LIMIT 1`,
+    [env.db.database, tableName, columnName],
+  )
+  return rows.length > 0
+}
+
+async function migrateLegacyCommunityAssignments(conn) {
+  // Early Community builds used the generic assignments table names now owned
+  // by the training/grading domain. Move those rows to their classroom-prefixed
+  // replacements, then let PLATFORM_TABLE_DDL recreate the intended tables.
+  if (!(await tableHasColumn(conn, 'assignments', 'classroom_id'))) return false
+
+  await conn.query(`
+    INSERT IGNORE INTO classroom_assignments
+      (id, classroom_id, title, description, instructions, due_at, max_marks,
+       submission_type, created_by, created_at, updated_at)
+    SELECT id, classroom_id, title, description, instructions, due_at, max_marks,
+           submission_type, created_by, created_at, updated_at
+    FROM assignments
+  `)
+
+  if (await tableHasColumn(conn, 'assignment_attachments', 'file_data')) {
+    await conn.query(`
+      INSERT IGNORE INTO classroom_assignment_attachments
+        (id, assignment_id, file_name, file_type, file_size, file_data, external_url, created_at)
+      SELECT id, assignment_id, file_name, file_type, file_size, file_data, external_url, created_at
+      FROM assignment_attachments
+    `)
+  }
+
+  if (await tableHasColumn(conn, 'assignment_submissions', 'student_id')) {
+    await conn.query(`
+      INSERT IGNORE INTO classroom_assignment_submissions
+        (id, assignment_id, student_id, body, link_url, file_name, file_type,
+         file_size, file_data, status, grade, feedback, submitted_at, graded_by, graded_at)
+      SELECT id, assignment_id, student_id, body, link_url, file_name, file_type,
+             file_size, file_data, status, grade, feedback, submitted_at, graded_by, graded_at
+      FROM assignment_submissions
+    `)
+  }
+
+  await conn.query('DROP TABLE IF EXISTS assignment_rubric_scores')
+  await conn.query('DROP TABLE IF EXISTS assignment_rubric_criteria')
+  await conn.query('DROP TABLE IF EXISTS assignment_submissions')
+  await conn.query('DROP TABLE IF EXISTS assignment_attachments')
+  await conn.query('DROP TABLE assignments')
+  return true
+}
+
 export async function createCoreTables(conn) {
   await conn.query(CORE_TABLE_DDL)
   // Training-domain tables depend on users/rooms/career_paths, so they run second.
   await conn.query(TRAINING_TABLE_DDL)
   // Community tables depend on users and create the classroom domain.
   await conn.query(COMMUNITY_TABLE_DDL)
+  await migrateLegacyCommunityAssignments(conn)
   // Platform tables depend on assessments and trainer_library_items.
   await conn.query(PLATFORM_TABLE_DDL)
   return (
@@ -554,6 +621,43 @@ export async function applyColumnMigrations(conn) {
   await conn
     .query('ALTER TABLE user_room_docker_instances MODIFY COLUMN host_port INT NULL')
     .catch(() => {})
+
+  // Merge duplicate channels created by concurrent first-visit requests.
+  // Messages are retained under the oldest channel in each classroom/scope.
+  await conn.query(`
+    UPDATE community_messages m
+    JOIN community_channels duplicate_channel ON duplicate_channel.id = m.channel_id
+    JOIN (
+      SELECT scope_classroom_id, name, MIN(id) AS keeper_id
+      FROM community_channels
+      GROUP BY scope_classroom_id, name
+    ) keeper_group
+      ON keeper_group.name = duplicate_channel.name
+      AND keeper_group.scope_classroom_id = duplicate_channel.scope_classroom_id
+    JOIN community_channels keeper ON keeper.id = keeper_group.keeper_id
+    SET m.channel_id = keeper.id
+    WHERE duplicate_channel.id <> keeper.id
+  `)
+  await conn.query(`
+    DELETE duplicate_channel
+    FROM community_channels duplicate_channel
+    JOIN community_channels keeper
+      ON keeper.name = duplicate_channel.name
+      AND keeper.scope_classroom_id = duplicate_channel.scope_classroom_id
+      AND keeper.id < duplicate_channel.id
+  `)
+
+  const [channelIndexRows] = await conn.query(
+    `SELECT 1 FROM information_schema.statistics
+     WHERE table_schema = ? AND table_name = 'community_channels'
+       AND index_name = 'uniq_channel_scope_name' LIMIT 1`,
+    [env.db.database],
+  )
+  if (!channelIndexRows.length) {
+    await conn.query(
+      'ALTER TABLE community_channels ADD UNIQUE KEY uniq_channel_scope_name (scope_classroom_id, name)',
+    )
+  }
 
   return applied
 }

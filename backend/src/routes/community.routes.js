@@ -50,11 +50,6 @@ async function ensureClassroomMember(req, res, classroomId) {
 }
 
 async function ensureGeneralChannelsExist(createdBy) {
-  const [rows] = await pool.query(
-    'SELECT COUNT(*) AS count FROM community_channels WHERE classroom_id IS NULL',
-  )
-  if (rows[0]?.count > 0) return
-
   const defaults = [
     ['general', 'General discussion for everyone'],
     ['announcements', 'Platform-wide announcements'],
@@ -64,7 +59,7 @@ async function ensureGeneralChannelsExist(createdBy) {
 
   for (const [name, topic] of defaults) {
     await pool.query(
-      'INSERT INTO community_channels (classroom_id, name, topic, kind, created_by) VALUES (NULL, ?, ?, ?, ?)',
+      'INSERT IGNORE INTO community_channels (classroom_id, name, topic, kind, created_by) VALUES (NULL, ?, ?, ?, ?)',
       [name, topic, name === 'announcements' ? 'announcements' : 'general', createdBy || null],
     )
   }
@@ -474,13 +469,21 @@ router.delete('/messages/:id', authenticate, async (req, res) => {
     return res.status(403).json({ message: 'You cannot delete this message.' })
   }
 
-  await pool.query(
-    'UPDATE community_messages SET deleted_at = CURRENT_TIMESTAMP, body = "" WHERE id = ?',
-    [existing.id],
-  )
+  if (existing.parent_message_id) {
+    await pool.query(
+      'UPDATE community_messages SET deleted_at = CURRENT_TIMESTAMP, body = "" WHERE id = ?',
+      [existing.id],
+    )
+  } else {
+    await pool.query(
+      `UPDATE community_messages SET deleted_at = CURRENT_TIMESTAMP, body = ""
+       WHERE id = ? OR parent_message_id = ?`,
+      [existing.id, existing.id],
+    )
+  }
 
   broadcastToChannel(existing.channel_id, {
-    type: 'message.deleted',
+    type: existing.parent_message_id ? 'message.deleted' : 'thread.deleted',
     channelId: existing.channel_id,
     messageId: existing.id,
     parentMessageId: existing.parent_message_id,
@@ -1346,11 +1349,11 @@ router.post('/assignments/:id/submissions', authenticate, async (req, res) => {
 })
 
 router.get('/submissions/:id/file', authenticate, async (req, res) => {
-  const [rows] = await pool.query('SELECT * FROM assignment_submissions WHERE id = ?', [req.params.id])
+  const [rows] = await pool.query('SELECT * FROM classroom_assignment_submissions WHERE id = ?', [req.params.id])
   const submission = rows[0]
   if (!submission?.file_data) return res.status(404).json({ message: 'Submission file not found.' })
 
-  const [assignmentRows] = await pool.query('SELECT * FROM assignments WHERE id = ?', [submission.assignment_id])
+  const [assignmentRows] = await pool.query('SELECT * FROM classroom_assignments WHERE id = ?', [submission.assignment_id])
   const assignment = assignmentRows[0]
   if (!assignment || !(await ensureClassroomMember(req, res, assignment.classroom_id))) return
   const membership = await fetchClassroomMembership(assignment.classroom_id, req.user.id)
