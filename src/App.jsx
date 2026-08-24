@@ -121,7 +121,7 @@ function App() {
   const [theme, setTheme] = useState(getSavedTheme)
   const platformConfigSaveRef = useRef({ inFlight: false, version: 0 })
   const location = useLocation()
-  const isPublicVerificationRoute = location.pathname.startsWith('/verify-certificate') || location.pathname.startsWith('/share/')
+
 
   const toggleTheme = () => {
     setTheme((current) => toggleThemeSetting(current))
@@ -300,16 +300,7 @@ function App() {
     )
   }
 
-  if (isPublicVerificationRoute) {
-    return (
-      <Routes>
-        <Route path="/verify-certificate" element={<CertificateVerificationPage />} />
-        <Route path="/verify-certificate/:certificateId" element={<CertificateVerificationPage />} />
-        <Route path="/share/:token" element={<PublicSharePage />} />
-        <Route path="*" element={<NotFoundPage variant="public" />} />
-      </Routes>
-    )
-  }
+
 
   if (!authSession) {
     return (
@@ -453,6 +444,8 @@ function App() {
             <Route path="/activity" element={<ActivityPage />} />
             <Route path="/learning-hub" element={<LearningExperiencePage />} />
             <Route path="/verify-certificate" element={<CertificateVerificationPage />} />
+            <Route path="/verify-certificate/:certificateId" element={<CertificateVerificationPage />} />
+            <Route path="/share/:token" element={<PublicSharePage />} />
             <Route path="*" element={<NotFoundPage variant="admin" />} />
           </Routes>
         </main>
@@ -497,6 +490,7 @@ function App() {
         <Routes>
           <Route path="/verify-certificate" element={<CertificateVerificationPage />} />
           <Route path="/verify-certificate/:certificateId" element={<CertificateVerificationPage />} />
+          <Route path="/share/:token" element={<PublicSharePage />} />
           <Route path="/login" element={<Navigate to="/" replace />} />
           <Route path="/register" element={<Navigate to="/" replace />} />
           <Route
