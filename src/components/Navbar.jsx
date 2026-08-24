@@ -165,82 +165,6 @@ function Navbar({ config, isSidebarOpen, onLogout, onToggleSidebar }) {
     { code: 'ur', name: 'Urdu (اردو)' }
   ]
 
-  const handleSearch = (value) => {
-    setSearchQuery(value)
-    
-    if (!value.trim()) {
-      setSearchResults([])
-      setShowResults(false)
-      return
-    }
-
-    const query = value.trim().toLowerCase()
-    const careerPaths = getCareerPathsData()
-    const rooms = getCoursesData()
-
-    const results = []
-
-    // Search in career paths
-    careerPaths.forEach((path) => {
-      if (searchableValue(path.title).includes(query) || searchableValue(path.description).includes(query)) {
-        results.push({
-          type: 'path',
-          id: path.id,
-          title: path.title,
-          description: path.description,
-          icon: 'school',
-        })
-      }
-
-      // Search in modules
-      if (path.modules) {
-        path.modules.forEach((module) => {
-          if (searchableValue(module.title).includes(query) || searchableValue(module.description).includes(query)) {
-            results.push({
-              type: 'module',
-              id: module.id,
-              pathId: path.id,
-              title: module.title,
-              description: module.description,
-              icon: 'layers',
-              pathTitle: path.title,
-            })
-          }
-        })
-      }
-    })
-
-    // Search in rooms
-    rooms.forEach((room) => {
-      if (searchableValue(room.title).includes(query) || searchableValue(room.description).includes(query)) {
-        results.push({
-          type: 'room',
-          id: room.id,
-          slug: room.slug,
-          title: room.title,
-          description: room.description,
-          icon: 'flag',
-        })
-      }
-    })
-
-    setSearchResults(results.slice(0, 8))
-    setShowResults(true)
-  }
-
-  const handleSelectResult = (result) => {
-    if (result.type === 'path') {
-      navigate(`/learn/path/${result.id}`)
-    } else if (result.type === 'module') {
-      navigate(`/learn/path/${result.pathId}/module/${result.id}`)
-    } else if (result.type === 'room') {
-      navigate(`/learn/lesson/${result.slug}`)
-    }
-    setSearchQuery('')
-    setShowResults(false)
-  }
-
-
   return (
     <>
       <header
@@ -435,7 +359,6 @@ function Navbar({ config, isSidebarOpen, onLogout, onToggleSidebar }) {
               </div>
             )}
           </div>
-          {config.features.navbarSettings ? (
           {!isTrainer && config.features.navbarSettings ? (
             <button
               className="inline-flex items-center justify-center hover:text-on-surface transition-colors"
