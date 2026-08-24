@@ -2,6 +2,7 @@ import app from './app.js'
 import { env } from './config/env.js'
 import { testConnection, initializeDatabaseIfNeeded } from './db/pool.js'
 import { setupRoomTerminalWebSocket } from './routes/rooms.routes.js'
+import { setupCommunityWebSocket } from './routes/community.routes.js'
 
 async function start() {
   try {
@@ -15,6 +16,7 @@ async function start() {
     })
 
     setupRoomTerminalWebSocket(server)
+    setupCommunityWebSocket(server)
 
     server.on('error', (error) => {
       if (error?.code === 'EADDRINUSE') {

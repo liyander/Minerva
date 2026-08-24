@@ -4,6 +4,7 @@ import {
   TRAINING_TABLE_DDL,
   TRAINING_TABLES,
 } from './trainingSchema.js'
+import { COMMUNITY_TABLE_DDL, COMMUNITY_TABLES } from './communitySchema.js'
 
 // Single source of truth for the database shape. Both the CLI initialiser and
 // the admin "Database" screen build the schema from here, so they can never
@@ -418,7 +419,7 @@ export const CORE_TABLES = [
   'developer_documents',
 ]
 
-export const EXPECTED_TABLES = [...CORE_TABLES, ...TRAINING_TABLES, ...FEATURE_TABLES]
+export const EXPECTED_TABLES = [...CORE_TABLES, ...TRAINING_TABLES, ...COMMUNITY_TABLES, ...FEATURE_TABLES]
 
 // Additive migrations for databases created by older versions.
 const COLUMN_MIGRATIONS = [
@@ -500,7 +501,9 @@ export async function createCoreTables(conn) {
   await conn.query(CORE_TABLE_DDL)
   // Training-domain tables depend on users/rooms/career_paths, so they run second.
   await conn.query(TRAINING_TABLE_DDL)
-  return CORE_TABLES.length + TRAINING_TABLES.length
+  // Community tables depend on users/classrooms, so they run last.
+  await conn.query(COMMUNITY_TABLE_DDL)
+  return CORE_TABLES.length + TRAINING_TABLES.length + COMMUNITY_TABLES.length
 }
 
 export async function applyColumnMigrations(conn) {

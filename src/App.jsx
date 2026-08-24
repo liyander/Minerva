@@ -64,6 +64,7 @@ import LearningPathDetailPage from './pages/LearningPathDetailPage'
 import EventsPage from './pages/EventsPage'
 import ProjectsPage from './pages/ProjectsPage'
 import ProjectDetailPage from './pages/ProjectDetailPage'
+import CommunityPage from './pages/CommunityPage'
 import { getSavedTheme, toggleTheme as toggleThemeSetting } from './services/theme'
 
 function ControlledOutageScreen() {
@@ -366,6 +367,7 @@ function App() {
           <Route path="/admin/projects" element={<AdminProjectsPage />} />
           <Route path="/admin/projects/:projectId/students/:userId" element={<AdminProjectSubmissionPage />} />
           <Route path="/developer" element={<DeveloperDashboardPage />} />
+          <Route path="/community" element={<CommunityPage />} />
           <Route path="*" element={<NotFoundPage variant="admin" />} />
         </Routes>
       </>
@@ -414,6 +416,7 @@ function App() {
             <Route path="/resources" element={<ResourcesPage />} />
             <Route path="/resources/:id" element={<ResourceDetailPage />} />
             <Route path="/notes" element={<NotesPage />} />
+            <Route path="/community" element={<CommunityPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/verify-certificate" element={<CertificateVerificationPage />} />
@@ -570,6 +573,7 @@ function App() {
             path="/notes"
             element={<NotesPage />}
           />
+          <Route path="/community" element={<CommunityPage />} />
           <Route path="/assessments" element={<AssessmentsPage />} />
           <Route path="/assessments/:assessmentId" element={<AssessmentAttemptPage />} />
           <Route path="/library" element={<TrainerLibraryPage />} />

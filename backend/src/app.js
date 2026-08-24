@@ -25,6 +25,7 @@ import profilesRoutes from './routes/profiles.routes.js'
 import assessmentsRoutes from './routes/assessments.routes.js'
 import trainingRoutes from './routes/training.routes.js'
 import adminUsersRoutes from './routes/adminUsers.routes.js'
+import communityRoutes from './routes/community.routes.js'
 import publicApiRoutes from './api/publicApi.routes.js'
 
 const app = express()
@@ -75,6 +76,7 @@ app.use('/api/profiles', profilesRoutes)
 app.use('/api/assessments', assessmentsRoutes)
 app.use('/api/training', trainingRoutes)
 app.use('/api/admin', adminUsersRoutes)
+app.use('/api/community', communityRoutes)
 app.use('/api/public', publicApiRoutes)
 
 // Async handlers reject rather than throw synchronously; wrapping every mounted
