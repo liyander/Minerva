@@ -211,6 +211,40 @@ router.delete('/me/:section/:id', async (req, res) => {
   return res.json({ deleted: true })
 })
 
+router.get('/me/activity', async (req, res) => {
+  try {
+    const userId = req.user.id
+    
+    // 1. Heatmap Data (aggregating from progress tables)
+    const [counts] = await pool.query(`
+      SELECT DATE(updated_at) as date, COUNT(*) as count
+      FROM (
+        SELECT updated_at FROM user_room_progress WHERE user_id = ?
+        UNION ALL
+        SELECT updated_at FROM user_room_question_progress WHERE user_id = ?
+        UNION ALL
+        SELECT created_at FROM user_room_theoretical_attempts WHERE user_id = ?
+      ) as combined
+      GROUP BY DATE(updated_at)
+    `, [userId, userId, userId])
+
+    // 2. Recent Logs Data (fetching actual courses interacted with)
+    const [logs] = await pool.query(`
+      SELECT r.title as action, urp.updated_at as time, 'school' as icon
+      FROM user_room_progress urp
+      JOIN rooms r ON urp.room_id = r.id
+      WHERE urp.user_id = ?
+      ORDER BY urp.updated_at DESC
+      LIMIT 10
+    `, [userId])
+
+    return res.json({ counts, logs })
+  } catch (error) {
+    console.error('Failed to fetch activity data:', error)
+    return res.status(500).json({ message: 'Failed to fetch activity data' })
+  }
+})
+
 /**
  * Public-facing profile. Trainers are visible to everyone so trainees can see
  * who teaches a subject; trainee profiles are visible to trainers and admins.

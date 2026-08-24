@@ -76,6 +76,7 @@ import EventsPage from './pages/EventsPage'
 import ProjectsPage from './pages/ProjectsPage'
 import ProjectDetailPage from './pages/ProjectDetailPage'
 import CommunityPage from './pages/CommunityPage'
+import ActivityPage from './pages/ActivityPage'
 import { getSavedTheme, toggleTheme as toggleThemeSetting } from './services/theme'
 
 function ControlledOutageScreen() {
@@ -444,6 +445,7 @@ function App() {
             <Route path="/community" element={<CommunityPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/activity" element={<ActivityPage />} />
             <Route path="/verify-certificate" element={<CertificateVerificationPage />} />
             <Route path="*" element={<NotFoundPage variant="admin" />} />
           </Routes>
@@ -650,6 +652,7 @@ function App() {
               )
             }
           />
+          <Route path="/activity" element={<ActivityPage />} />
           <Route path="/admin" element={<Navigate to="/" replace />} />
           <Route
             path="*"

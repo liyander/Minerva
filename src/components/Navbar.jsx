@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { getAuthSession, hasRole, ROLES } from '../auth'
 import { apiFetch } from '../services/api'
 import GlobalSearch from './GlobalSearch'
@@ -254,12 +254,12 @@ function Navbar({ config, isSidebarOpen, onLogout, onToggleSidebar }) {
         {config.features.navbarSearch ? (
           <GlobalSearch className="hidden 2xl:block" />
         ) : null}
-        {!isTrainer ? <div className="hidden lg:flex items-center gap-2 px-4 py-2 bg-butter rounded-full whitespace-nowrap">
+        {!isTrainer ? <Link to="/activity" className="hidden lg:flex items-center gap-2 px-4 py-2 bg-butter rounded-full whitespace-nowrap hover:opacity-90 transition-opacity cursor-pointer shadow-sm hover:shadow-md">
           <span className="material-symbols-outlined text-on-butter text-base">local_fire_department</span>
           <span className="font-headline text-xs font-bold text-on-butter">
             {Number(streak.currentStreak || 0)}-day streak
           </span>
-        </div> : null}
+        </Link> : null}
         {isTrainer ? (
           <div className="relative" ref={quickCreateRef}>
             <button
