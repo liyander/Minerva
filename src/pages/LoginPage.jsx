@@ -102,6 +102,13 @@ function LoginPage({ onLoginSuccess }) {
 
             <Link
               className="block text-center text-sm font-body text-primary hover:underline"
+              to="/forgot-password"
+            >
+              Forgot your password?
+            </Link>
+
+            <Link
+              className="block text-center text-sm font-body text-primary hover:underline"
               to="/register"
             >
               New here? Create an account

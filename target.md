@@ -57,14 +57,14 @@ This file is the implementation tracker for the next platform features.
 
 ## Communication and accounts
 
-- [ ] **Email delivery**
+- [x] ~~**Email delivery**~~
   - Deliver approval and rejection decisions by email.
   - Send assignment, assessment, event, and mandatory-training deadline reminders.
   - Send configurable weekly progress digests.
   - Record delivery status, errors, and deduplication information.
   - Provide administrator controls for email configuration and manual reminder runs.
 
-- [ ] **Password reset and change-password**
+- [x] ~~**Password reset and change-password**~~
   - Implement forgot-password emails with single-use, expiring tokens.
   - Implement reset-password and authenticated change-password flows.
   - Revoke or invalidate relevant sessions after a password change.
@@ -72,19 +72,19 @@ This file is the implementation tracker for the next platform features.
 
 ## Cohorts and mandatory training
 
-- [ ] **Cohorts and batches**
+- [x] ~~**Cohorts and batches**~~
   - Create and manage cohorts by department, dates, and owner.
   - Add and remove trainees and trainers.
   - Assign courses or learning paths to an entire cohort.
   - Track cohort-level enrolment, progress, completion, and performance.
 
-- [ ] **Mandatory training and compliance**
+- [x] ~~**Mandatory training and compliance**~~
   - Assign required training globally or by cohort or department.
   - Support due dates and active/inactive requirements.
   - Show each trainee their pending, completed, upcoming, and overdue requirements.
   - Provide an administrator compliance view with filters and completion rates.
 
-- [ ] **Bulk CSV user import and enrolment**
+- [x] ~~**Bulk CSV user import and enrolment**~~
   - Provide a downloadable CSV template.
   - Validate rows and show a preview before committing changes.
   - Report row-level errors without discarding valid rows.

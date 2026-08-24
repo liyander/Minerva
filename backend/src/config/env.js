@@ -67,6 +67,10 @@ export const env = {
     user: process.env.SMTP_USER || '',
     password: process.env.SMTP_PASSWORD || '',
     from: process.env.MAIL_FROM || 'Minerva <no-reply@minerva.local>',
+    remindersEnabled: String(process.env.REMINDERS_ENABLED || 'true') !== 'false',
+    reminderWindowDays: Number(process.env.REMINDER_WINDOW_DAYS || 3),
+    digestWeekday: Number(process.env.DIGEST_WEEKDAY || 1),
+    scheduleHours: Number(process.env.MAIL_SCHEDULE_HOURS || 6),
   },
   security: {
     passwordResetMinutes: Number(process.env.PASSWORD_RESET_MINUTES || 60),

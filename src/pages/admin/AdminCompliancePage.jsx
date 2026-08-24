@@ -15,6 +15,7 @@ import { apiFetch } from '../../services/api'
 const STATUS_TONE = {
   complete: 'bg-mint text-on-mint',
   pending: 'bg-butter text-on-butter',
+  upcoming: 'bg-sky text-on-sky',
   overdue: 'bg-blush text-on-blush',
 }
 
@@ -32,6 +33,8 @@ function AdminCompliancePage() {
   const [notice, setNotice] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [expanded, setExpanded] = useState(null)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
 
   const [form, setForm] = useState({
     title: '',
@@ -137,6 +140,17 @@ function AdminCompliancePage() {
     [cohorts],
   )
 
+  const visibleRequirements = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    return requirements.filter((requirement) => {
+      const reportRow = report.find((row) => Number(row.requirement.id) === Number(requirement.id))
+      const matchesSearch = !query || [requirement.title, requirement.target, requirement.cohortName, requirement.department]
+        .some((value) => String(value || '').toLowerCase().includes(query))
+      const matchesStatus = statusFilter === 'all' || Number(reportRow?.summary?.[statusFilter] || 0) > 0
+      return matchesSearch && matchesStatus
+    })
+  }, [requirements, report, search, statusFilter])
+
   const fieldClass =
     'w-full rounded-xl bg-surface-container border border-transparent focus:border-primary focus:ring-0 font-body text-sm py-2.5 px-3.5 outline-none'
   const pill = 'rounded-full px-5 py-2.5 font-headline text-sm font-bold transition-opacity hover:opacity-90 disabled:opacity-60'
@@ -203,6 +217,16 @@ function AdminCompliancePage() {
             >
               {showCreate ? 'Cancel' : 'New requirement'}
             </button>
+          </div>
+          <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_12rem]">
+            <input className={fieldClass} onChange={(event) => setSearch(event.target.value)} placeholder="Search requirement, cohort or department" value={search} />
+            <select className={fieldClass} onChange={(event) => setStatusFilter(event.target.value)} value={statusFilter}>
+              <option value="all">All statuses</option>
+              <option value="complete">Has completed</option>
+              <option value="upcoming">Has upcoming</option>
+              <option value="pending">Has pending</option>
+              <option value="overdue">Has overdue</option>
+            </select>
           </div>
 
           {showCreate ? (
@@ -332,7 +356,7 @@ function AdminCompliancePage() {
             </p>
           ) : (
             <div className="space-y-2">
-              {requirements.map((requirement) => {
+              {visibleRequirements.map((requirement) => {
                 const reportRow = report.find(
                   (row) => Number(row.requirement.id) === Number(requirement.id),
                 )
@@ -419,7 +443,7 @@ function AdminCompliancePage() {
                     {expanded === requirement.id && reportRow ? (
                       <div className="mt-4 border-t border-outline-variant pt-4">
                         <div className="flex flex-wrap gap-3 mb-3">
-                          {['complete', 'pending', 'overdue'].map((status) => (
+                          {['complete', 'upcoming', 'pending', 'overdue'].map((status) => (
                             <span
                               className={`rounded-full px-3 py-1 font-headline text-xs font-bold ${STATUS_TONE[status]}`}
                               key={status}

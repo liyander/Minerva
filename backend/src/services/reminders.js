@@ -1,5 +1,6 @@
 import { pool } from '../db/pool.js'
 import { sendMail } from './mailer.js'
+import { env } from '../config/env.js'
 
 /**
  * Scheduled email jobs. Both are idempotent through the mailer's dedupe key, so
@@ -20,11 +21,41 @@ function formatDue(value) {
     : date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 }
 
+async function requirementComplete(requirement, userId) {
+  if (requirement.room_id) {
+    const [rows] = await pool.query(
+      'SELECT 1 FROM user_room_progress WHERE user_id = ? AND room_id = ? AND completed_at IS NOT NULL LIMIT 1',
+      [userId, requirement.room_id],
+    )
+    return Boolean(rows.length)
+  }
+  if (requirement.assessment_id) {
+    const [rows] = await pool.query(
+      'SELECT 1 FROM assessment_attempts WHERE user_id = ? AND assessment_id = ? AND passed = true LIMIT 1',
+      [userId, requirement.assessment_id],
+    )
+    return Boolean(rows.length)
+  }
+  if (requirement.career_path_id) {
+    const [rows] = await pool.query(
+      `SELECT COUNT(DISTINCT mr.room_id) AS required,
+              COUNT(DISTINCT CASE WHEN progress.completed_at IS NOT NULL THEN mr.room_id END) AS completed
+       FROM career_path_modules module
+       JOIN career_path_module_rooms mr ON mr.module_id = module.id
+       LEFT JOIN user_room_progress progress ON progress.room_id = mr.room_id AND progress.user_id = ?
+       WHERE module.career_path_id = ?`,
+      [userId, requirement.career_path_id],
+    )
+    return Number(rows[0]?.required || 0) > 0 && Number(rows[0]?.completed || 0) >= Number(rows[0]?.required || 0)
+  }
+  return false
+}
+
 /**
  * Emails trainees about assessments, assignments and mandatory training falling
  * due in the next three days that they have not yet completed.
  */
-export async function runDeadlineReminders({ withinDays = 3 } = {}) {
+export async function runDeadlineReminders({ withinDays = env.mail.reminderWindowDays } = {}) {
   const horizon = new Date(Date.now() + withinDays * DAY_MS)
   const horizonSql = horizon.toISOString().slice(0, 19).replace('T', ' ')
 
@@ -79,9 +110,23 @@ export async function runDeadlineReminders({ withinDays = 3 } = {}) {
   )
   for (const row of assignmentRows) push(row, row.title, row.deadline)
 
+  // Events the trainee explicitly registered for.
+  const [eventRows] = await pool.query(
+    `SELECT u.id, u.email, u.first_name, u.username, event.name AS title, event.live_time AS deadline
+     FROM ctf_event_registrations registration
+     JOIN ctf_events event ON event.id = registration.ctf_event_id
+     JOIN users u ON u.id = registration.user_id
+     WHERE registration.registered = true AND event.is_active = true
+       AND event.live_time BETWEEN NOW() AND ?
+       AND u.is_active = true`,
+    [horizonSql],
+  )
+  for (const row of eventRows) push(row, `${row.title} (event)`, row.deadline)
+
   // Mandatory training due soon, resolved through cohort or department.
   const [requirementRows] = await pool.query(
-    `SELECT u.id, u.email, u.first_name, u.username, t.title, t.due_on
+    `SELECT u.id, u.email, u.first_name, u.username, t.title, t.due_on,
+            t.room_id, t.career_path_id, t.assessment_id
      FROM training_requirements t
      JOIN users u ON (
        t.applies_to_all = true
@@ -97,14 +142,15 @@ export async function runDeadlineReminders({ withinDays = 3 } = {}) {
        AND u.is_active = true`,
     [withinDays],
   )
-  for (const row of requirementRows) push(row, `${row.title} (required)`, row.due_on)
+  for (const row of requirementRows) {
+    if (!(await requirementComplete(row, row.id))) push(row, `${row.title} (required)`, row.due_on)
+  }
 
   const today = dayKey()
   let sent = 0
   let skipped = 0
 
   for (const [userId, entry] of pending) {
-    // eslint-disable-next-line no-await-in-loop
     const result = await sendMail({
       to: entry.email,
       template: 'deadlineReminder',
@@ -140,7 +186,6 @@ export async function runWeeklyDigest() {
   let skipped = 0
 
   for (const user of users) {
-    /* eslint-disable no-await-in-loop */
     const [statRows] = await pool.query(
       `SELECT
          (SELECT COUNT(*) FROM user_room_progress p
@@ -170,7 +215,6 @@ export async function runWeeklyDigest() {
       data: { name: user.first_name || user.username, stats, highlights },
       dedupeKey: `digest:${user.id}:${week}`,
     })
-    /* eslint-enable no-await-in-loop */
 
     if (result.sent) sent += 1
     else skipped += 1
@@ -185,7 +229,7 @@ export async function runWeeklyDigest() {
  * REMINDERS_ENABLED=false to leave scheduling to an external cron instead.
  */
 export function startReminderSchedule() {
-  if (String(process.env.REMINDERS_ENABLED || 'true') === 'false') {
+  if (!env.mail.remindersEnabled) {
     return null
   }
 
@@ -197,7 +241,7 @@ export function startReminderSchedule() {
     }
 
     // Digest only on Mondays.
-    if (new Date().getDay() === 1) {
+    if (new Date().getDay() === env.mail.digestWeekday) {
       try {
         await runWeeklyDigest()
       } catch (error) {
@@ -206,7 +250,7 @@ export function startReminderSchedule() {
     }
   }
 
-  const timer = setInterval(runAll, 6 * 60 * 60 * 1000)
+  const timer = setInterval(runAll, Math.max(1, env.mail.scheduleHours) * 60 * 60 * 1000)
   timer.unref?.()
   // Give the server a moment to finish booting before the first pass.
   setTimeout(runAll, 60_000).unref?.()

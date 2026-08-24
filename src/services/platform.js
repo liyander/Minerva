@@ -82,6 +82,8 @@ export const bulkEnrolCohort = (id, payload) =>
   apiFetch(`/cohorts/${id}/enrol`, { method: 'POST', ...json(payload) })
 export const importUsers = (payload) =>
   apiFetch('/cohorts/import/users', { method: 'POST', ...json(payload) })
+export const previewUserImport = (payload) =>
+  apiFetch('/cohorts/import/users/preview', { method: 'POST', ...json(payload) })
 
 /* ------------------------------------------------------------ compliance --- */
 export const fetchRequirements = () => apiFetch('/compliance/requirements')

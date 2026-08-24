@@ -10,7 +10,9 @@ import {
   fetchCohortMembers,
   fetchCohorts,
   importUsers,
+  previewUserImport,
   removeCohortMember,
+  updateCohort,
 } from '../../services/platform'
 import { apiFetch } from '../../services/api'
 
@@ -98,7 +100,9 @@ function AdminCohortsPage() {
   const [notice, setNotice] = useState('')
   const [tab, setTab] = useState('members')
 
-  const [form, setForm] = useState({ name: '', code: '', department: '', description: '' })
+  const [form, setForm] = useState({
+    name: '', code: '', department: '', description: '', startsOn: '', endsOn: '', ownerId: '',
+  })
   const [showCreate, setShowCreate] = useState(false)
   const [memberQuery, setMemberQuery] = useState('')
   const [selectedUsers, setSelectedUsers] = useState([])
@@ -106,6 +110,7 @@ function AdminCohortsPage() {
 
   const [csvText, setCsvText] = useState('')
   const [importResult, setImportResult] = useState(null)
+  const [importPreview, setImportPreview] = useState(null)
   const [autoApprove, setAutoApprove] = useState(true)
 
   const load = useCallback(async () => {
@@ -189,7 +194,7 @@ function AdminCohortsPage() {
     setError('')
     try {
       const { id } = await createCohort(form)
-      setForm({ name: '', code: '', department: '', description: '' })
+      setForm({ name: '', code: '', department: '', description: '', startsOn: '', endsOn: '', ownerId: '' })
       setShowCreate(false)
       await load()
       await openCohort({ id, name: form.name })
@@ -224,6 +229,33 @@ function AdminCohortsPage() {
     } finally {
       setBusy(false)
     }
+  }
+
+  const previewImport = async () => {
+    const rows = parseCsv(csvText)
+    if (!rows.length) {
+      setError('No rows found. Include a header line, then one row per person.')
+      return
+    }
+    setBusy(true)
+    setError('')
+    try {
+      setImportPreview(await previewUserImport({ rows }))
+      setImportResult(null)
+    } catch (previewError) {
+      setError(previewError?.message || 'Could not validate the CSV.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const downloadTemplate = () => {
+    const url = URL.createObjectURL(new Blob([`${SAMPLE_CSV}\n`], { type: 'text/csv' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'minerva-user-import-template.csv'
+    link.click()
+    URL.revokeObjectURL(url)
   }
 
   const runBulkEnrol = async () => {
@@ -332,6 +364,29 @@ function AdminCohortsPage() {
                   />
                 </label>
               </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <label className="block">
+                  <span className="font-headline text-xs font-bold text-on-surface-variant">Starts</span>
+                  <input className={`${fieldClass} mt-1.5`} onChange={(e) => setForm((f) => ({ ...f, startsOn: e.target.value }))} type="date" value={form.startsOn} />
+                </label>
+                <label className="block">
+                  <span className="font-headline text-xs font-bold text-on-surface-variant">Ends</span>
+                  <input className={`${fieldClass} mt-1.5`} min={form.startsOn || undefined} onChange={(e) => setForm((f) => ({ ...f, endsOn: e.target.value }))} type="date" value={form.endsOn} />
+                </label>
+                <label className="block">
+                  <span className="font-headline text-xs font-bold text-on-surface-variant">Owner</span>
+                  <select className={`${fieldClass} mt-1.5`} onChange={(e) => setForm((f) => ({ ...f, ownerId: e.target.value }))} value={form.ownerId}>
+                    <option value="">Current administrator</option>
+                    {allUsers.filter((user) => ['trainer', 'admin'].includes(user.role)).map((user) => (
+                      <option key={user.id} value={user.id}>{user.name}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <label className="block">
+                <span className="font-headline text-xs font-bold text-on-surface-variant">Description</span>
+                <textarea className={`${fieldClass} mt-1.5`} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} rows={2} value={form.description} />
+              </label>
               <button className={`${pill} bg-primary text-on-primary`} disabled={busy} type="submit">
                 Create cohort
               </button>
@@ -380,6 +435,16 @@ function AdminCohortsPage() {
                       <span className="material-symbols-outlined text-base">delete</span>
                     </button>
                   </div>
+                  <button
+                    className="mt-3 font-headline text-xs font-bold underline opacity-70 hover:opacity-100"
+                    onClick={async () => {
+                      await updateCohort(cohort.id, { isActive: !cohort.isActive })
+                      await load()
+                    }}
+                    type="button"
+                  >
+                    {cohort.isActive ? 'Archive cohort' : 'Reactivate cohort'}
+                  </button>
                   {!cohort.isActive ? (
                     <span className="mt-2 inline-block rounded-full bg-surface-container-high px-2 py-0.5 font-headline text-[11px] font-bold">
                       Inactive
@@ -584,6 +649,9 @@ function AdminCohortsPage() {
                       Only <strong>firstName</strong> and <strong>email</strong> are required. Leave
                       the password column out and a temporary one is generated and shown once.
                     </p>
+                    <button className="mt-3 font-headline text-xs font-bold text-primary hover:underline" onClick={downloadTemplate} type="button">
+                      Download CSV template
+                    </button>
                   </div>
 
                   <label className="block">
@@ -595,7 +663,10 @@ function AdminCohortsPage() {
                       className={`${fieldClass} mt-1.5 file:mr-3 file:rounded-full file:border-0 file:bg-primary file:px-4 file:py-1.5 file:font-headline file:text-xs file:font-bold file:text-on-primary`}
                       onChange={async (event) => {
                         const file = event.target.files?.[0]
-                        if (file) setCsvText(await file.text())
+                        if (file) {
+                          setCsvText(await file.text())
+                          setImportPreview(null)
+                        }
                       }}
                       type="file"
                     />
@@ -603,7 +674,10 @@ function AdminCohortsPage() {
 
                   <textarea
                     className={`${fieldClass} font-mono`}
-                    onChange={(e) => setCsvText(e.target.value)}
+                    onChange={(e) => {
+                      setCsvText(e.target.value)
+                      setImportPreview(null)
+                    }}
                     placeholder={SAMPLE_CSV}
                     rows={8}
                     value={csvText}
@@ -624,12 +698,32 @@ function AdminCohortsPage() {
                     <button
                       className={`${pill} bg-primary text-on-primary`}
                       disabled={busy || !csvText.trim()}
-                      onClick={runImport}
+                      onClick={previewImport}
                       type="button"
                     >
-                      {busy ? 'Importing…' : `Import ${parseCsv(csvText).length || ''} rows`}
+                      {busy ? 'Validating…' : `Validate ${parseCsv(csvText).length || ''} rows`}
                     </button>
+                    {importPreview?.valid ? (
+                      <button className={`${pill} bg-secondary text-on-secondary`} disabled={busy} onClick={runImport} type="button">
+                        Import {importPreview.valid} valid rows
+                      </button>
+                    ) : null}
                   </div>
+
+                  {importPreview ? (
+                    <div className="rounded-2xl bg-surface-container p-4">
+                      <p className="font-headline text-sm font-bold text-on-surface">
+                        Preview: {importPreview.valid} valid, {importPreview.invalid} invalid
+                      </p>
+                      <div className="mt-3 max-h-52 overflow-y-auto space-y-1">
+                        {importPreview.results.map((row) => (
+                          <p className="font-body text-xs text-on-surface-variant" key={`${row.line}-${row.email}`}>
+                            Line {row.line}: {row.name || row.email || 'Unnamed'} — {row.status}{row.reason ? ` (${row.reason})` : ''}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
 
                   {importResult ? (
                     <div className="rounded-2xl bg-surface-container p-4">

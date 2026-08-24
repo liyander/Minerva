@@ -5,6 +5,7 @@ import { fetchMyRequirements } from '../services/platform'
 const TONE = {
   overdue: { card: 'bg-blush text-on-blush', label: 'Overdue' },
   pending: { card: 'bg-butter text-on-butter', label: 'Due' },
+  upcoming: { card: 'bg-sky text-on-sky', label: 'Upcoming' },
   complete: { card: 'bg-mint text-on-mint', label: 'Complete' },
 }
 
@@ -40,7 +41,7 @@ function RequiredTrainingPanel() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {[...requirements]
           .sort((a, b) => {
-            const rank = { overdue: 0, pending: 1, complete: 2 }
+            const rank = { overdue: 0, upcoming: 1, pending: 2, complete: 3 }
             return rank[a.status] - rank[b.status]
           })
           .slice(0, 4)

@@ -73,7 +73,6 @@ router.post('/register', async (req, res) => {
 
   let suffix = 1
   // Ensure generated username uniqueness.
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const [existingRows] = await pool.query('SELECT 1 FROM users WHERE username = ? LIMIT 1', [username])
     if (!existingRows.length) {
@@ -91,7 +90,7 @@ router.post('/register', async (req, res) => {
       [username, registrationNumber, email, hash],
     )
 
-    const token = signToken({ id: result.insertId, username, role: 'operator' })
+    const token = signToken({ id: result.insertId, username, role: 'operator', sessionVersion: 0 })
     return res.status(201).json({
       token,
       user: {
@@ -123,7 +122,6 @@ async function uniqueUsername(base) {
   let username = safeBase
   let suffix = 1
 
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const [rows] = await pool.query('SELECT 1 FROM users WHERE username = ? LIMIT 1', [username])
     if (!rows.length) return username
@@ -206,7 +204,7 @@ router.post('/signup', async (req, res) => {
       })
     }
 
-    const token = signToken({ id: result.insertId, username, role: requestedRole })
+    const token = signToken({ id: result.insertId, username, role: requestedRole, sessionVersion: 0 })
     return res.status(201).json({
       token,
       user: {
@@ -243,7 +241,7 @@ router.post('/login', async (req, res) => {
 
   const [rows] = await pool.query(
     `SELECT id, username, email, registration_number, role, password_hash, is_active,
-            approval_status, first_name, last_name
+            approval_status, first_name, last_name, session_version
      FROM users
      WHERE username = ? OR email = ? OR registration_number = ?
      LIMIT 1`,
@@ -273,7 +271,12 @@ router.post('/login', async (req, res) => {
   }
 
   const role = normaliseRole(user.role)
-  const token = signToken({ id: user.id, username: user.username, role })
+  const token = signToken({
+    id: user.id,
+    username: user.username,
+    role,
+    sessionVersion: Number(user.session_version || 0),
+  })
   await pool.query('UPDATE users SET last_login_at = CURRENT_TIMESTAMP, last_seen_at = CURRENT_TIMESTAMP WHERE id = ?', [
     user.id,
   ])
@@ -369,7 +372,10 @@ router.post('/reset-password', async (req, res) => {
   }
 
   const hash = await bcrypt.hash(password, 10)
-  await pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [hash, rows[0].user_id])
+  await pool.query(
+    'UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?',
+    [hash, rows[0].user_id],
+  )
   await pool.query('UPDATE password_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE id = ?', [
     rows[0].id,
   ])
@@ -410,7 +416,7 @@ router.post('/change-password', authenticate, async (req, res) => {
     return res.status(401).json({ message: 'Your current password is not correct' })
   }
 
-  await pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [
+  await pool.query('UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?', [
     await bcrypt.hash(newPassword, 10),
     req.user.id,
   ])

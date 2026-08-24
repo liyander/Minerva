@@ -180,5 +180,9 @@ export function mailerStatus() {
     configured: Boolean(env.mail.host),
     host: env.mail.host || null,
     from: env.mail.from,
+    remindersEnabled: env.mail.remindersEnabled,
+    reminderWindowDays: env.mail.reminderWindowDays,
+    digestWeekday: env.mail.digestWeekday,
+    scheduleHours: env.mail.scheduleHours,
   }
 }

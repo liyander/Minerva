@@ -230,16 +230,15 @@ router.get('/report', requireTrainer, async (req, res) => {
   )
 
   const today = new Date().toISOString().slice(0, 10)
+  const upcomingCutoff = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
   const report = []
 
   for (const requirement of requirements) {
-    /* eslint-disable no-await-in-loop */
     const audience = await audienceFor(requirement)
     const completion = await completionFor(
       requirement,
       audience.map((person) => person.id),
     )
-    /* eslint-enable no-await-in-loop */
 
     const overdue = requirement.due_on && toDate(requirement.due_on) < today
 
@@ -250,7 +249,13 @@ router.get('/report', requireTrainer, async (req, res) => {
         name: [person.first_name, person.last_name].filter(Boolean).join(' ') || person.username,
         email: person.email,
         department: person.department,
-        status: completedAt ? 'complete' : overdue ? 'overdue' : 'pending',
+        status: completedAt
+          ? 'complete'
+          : overdue
+            ? 'overdue'
+            : requirement.due_on && toDate(requirement.due_on) <= upcomingCutoff
+              ? 'upcoming'
+              : 'pending',
         completedAt,
       }
     })
@@ -271,6 +276,7 @@ router.get('/report', requireTrainer, async (req, res) => {
         audience: people.length,
         complete: people.filter((person) => person.status === 'complete').length,
         pending: people.filter((person) => person.status === 'pending').length,
+        upcoming: people.filter((person) => person.status === 'upcoming').length,
         overdue: people.filter((person) => person.status === 'overdue').length,
         compliance: people.length
           ? Math.round(
@@ -316,10 +322,10 @@ router.get('/me', async (req, res) => {
   )
 
   const today = new Date().toISOString().slice(0, 10)
+  const upcomingCutoff = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
   const output = []
 
   for (const requirement of requirements) {
-    // eslint-disable-next-line no-await-in-loop
     const completion = await completionFor(requirement, [user.id])
     const completedAt = completion.get(Number(user.id)) || null
     const overdue = requirement.due_on && toDate(requirement.due_on) < today && !completedAt
@@ -330,7 +336,13 @@ router.get('/me', async (req, res) => {
       description: requirement.description,
       dueOn: requirement.due_on,
       isMandatory: Boolean(requirement.is_mandatory),
-      status: completedAt ? 'complete' : overdue ? 'overdue' : 'pending',
+      status: completedAt
+        ? 'complete'
+        : overdue
+          ? 'overdue'
+          : requirement.due_on && toDate(requirement.due_on) <= upcomingCutoff
+            ? 'upcoming'
+            : 'pending',
       completedAt,
       target: requirement.course_title || requirement.path_title || requirement.assessment_title,
       link: requirement.course_slug

@@ -11,14 +11,26 @@ router.use(authenticate)
 
 /* ------------------------------------------------------------------ cohorts */
 
-router.get('/', requireTrainer, async (_req, res) => {
+router.get('/', requireTrainer, async (req, res) => {
+  const scope = req.user.role === ROLES.ADMIN
+    ? { sql: '', params: [] }
+    : {
+        sql: `WHERE c.owner_id = ? OR EXISTS (
+          SELECT 1 FROM cohort_members access_member
+          WHERE access_member.cohort_id = c.id AND access_member.user_id = ?
+            AND access_member.member_role = 'trainer'
+        )`,
+        params: [req.user.id, req.user.id],
+      }
   const [rows] = await pool.query(
     `SELECT c.*, u.username AS owner_username, u.first_name AS owner_first_name,
             (SELECT COUNT(*) FROM cohort_members m WHERE m.cohort_id = c.id) AS member_count
      FROM cohorts c
      LEFT JOIN users u ON u.id = c.owner_id
+     ${scope.sql}
      ORDER BY c.is_active DESC, c.created_at DESC
      LIMIT 200`,
+    scope.params,
   )
 
   return res.json(
@@ -89,6 +101,9 @@ router.get('/me', async (req, res) => {
 router.post('/', requireAdmin, async (req, res) => {
   const name = String(req.body?.name || '').trim()
   if (!name) return res.status(400).json({ message: 'Name is required' })
+  if (req.body?.startsOn && req.body?.endsOn && req.body.endsOn < req.body.startsOn) {
+    return res.status(400).json({ message: 'End date must be on or after the start date' })
+  }
 
   try {
     const [result] = await pool.query(
@@ -159,6 +174,17 @@ router.delete('/:id', requireAdmin, async (req, res) => {
 
 /** Members plus a progress roll-up per person. */
 router.get('/:id/members', requireTrainer, async (req, res) => {
+  if (req.user.role !== ROLES.ADMIN) {
+    const [access] = await pool.query(
+      `SELECT 1 FROM cohorts c
+       WHERE c.id = ? AND (c.owner_id = ? OR EXISTS (
+         SELECT 1 FROM cohort_members m
+         WHERE m.cohort_id = c.id AND m.user_id = ? AND m.member_role = 'trainer'
+       )) LIMIT 1`,
+      [req.params.id, req.user.id, req.user.id],
+    )
+    if (!access.length) return res.status(403).json({ message: 'You do not manage this cohort' })
+  }
   const [rows] = await pool.query(
     `SELECT m.id AS membership_id, m.member_role, m.joined_at,
             u.id, u.username, u.first_name, u.last_name, u.email, u.role, u.department,
@@ -198,10 +224,19 @@ router.post('/:id/members', requireAdmin, async (req, res) => {
   const userIds = Array.isArray(req.body?.userIds) ? req.body.userIds : []
   if (!userIds.length) return res.status(400).json({ message: 'Provide at least one user' })
 
-  const memberRole = normaliseRole(req.body?.memberRole || ROLES.TRAINEE)
+  const requestedMemberRole = req.body?.memberRole
+    ? normaliseRole(req.body.memberRole)
+    : null
 
   let added = 0
   for (const userId of userIds) {
+    let memberRole = requestedMemberRole
+    if (!memberRole) {
+      // Preserve trainer membership when the mixed-role picker is used.
+      const [userRows] = await pool.query('SELECT role FROM users WHERE id = ? LIMIT 1', [userId])
+      if (!userRows.length) continue
+      memberRole = normaliseRole(userRows[0].role)
+    }
     const [result] = await pool.query(
       `INSERT INTO cohort_members (cohort_id, user_id, member_role) VALUES (?, ?, ?)
        ON DUPLICATE KEY UPDATE member_role = VALUES(member_role)`,
@@ -276,6 +311,44 @@ router.post('/:id/enrol', requireAdmin, async (req, res) => {
 
 /* -------------------------------------------------------------- bulk import */
 
+/** Validates a CSV payload without creating accounts. */
+router.post('/import/users/preview', requireAdmin, async (req, res) => {
+  const rows = Array.isArray(req.body?.rows) ? req.body.rows : []
+  if (!rows.length) return res.status(400).json({ message: 'No rows to preview' })
+  if (rows.length > 1000) return res.status(413).json({ message: 'Preview at most 1000 rows' })
+
+  const emails = rows.map((row) => String(row.email || '').trim().toLowerCase()).filter(Boolean)
+  const [existingRows] = emails.length
+    ? await pool.query('SELECT LOWER(email) AS email FROM users WHERE LOWER(email) IN (?)', [emails])
+    : [[]]
+  const existing = new Set(existingRows.map((row) => row.email))
+  const seen = new Set()
+  const results = rows.map((row, index) => {
+    const email = String(row.email || '').trim().toLowerCase()
+    const firstName = String(row.firstName || row.first_name || '').trim()
+    let reason = ''
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) reason = 'Invalid email'
+    else if (!firstName) reason = 'Missing first name'
+    else if (seen.has(email)) reason = 'Duplicate email in this file'
+    else if (existing.has(email)) reason = 'Email already exists'
+    seen.add(email)
+    return {
+      line: index + 1,
+      email,
+      name: [firstName, row.lastName || row.last_name].filter(Boolean).join(' '),
+      status: reason ? 'invalid' : 'valid',
+      reason: reason || undefined,
+    }
+  })
+
+  return res.json({
+    total: results.length,
+    valid: results.filter((row) => row.status === 'valid').length,
+    invalid: results.filter((row) => row.status === 'invalid').length,
+    results,
+  })
+})
+
 /**
  * Creates accounts from parsed CSV rows. Rows are validated individually so one
  * bad line does not abort the whole import; every outcome is reported back.
@@ -320,7 +393,6 @@ router.post('/import/users', requireAdmin, async (req, res) => {
 
     let username = base
     let suffix = 1
-    /* eslint-disable no-await-in-loop */
     while (true) {
       const [taken] = await pool.query('SELECT 1 FROM users WHERE username = ? LIMIT 1', [username])
       if (!taken.length) break
@@ -371,7 +443,6 @@ router.post('/import/users', requireAdmin, async (req, res) => {
         reason: error?.code === 'ER_DUP_ENTRY' ? 'Email already exists' : error.message,
       })
     }
-    /* eslint-enable no-await-in-loop */
   }
 
   await recordAudit(req, {

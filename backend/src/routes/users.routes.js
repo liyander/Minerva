@@ -198,7 +198,10 @@ router.post('/me/password', authenticate, async (req, res) => {
   }
 
   const hash = await bcrypt.hash(newPassword, 10)
-  await pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [hash, req.user.id])
+  await pool.query(
+    'UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?',
+    [hash, req.user.id],
+  )
 
   return res.json({ changed: true })
 })
@@ -395,7 +398,10 @@ router.post('/admin/registrations/:id/password', authenticate, requireAdmin, asy
   }
 
   const hash = await bcrypt.hash(newPassword, 10)
-  await pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [hash, userId])
+  await pool.query(
+    'UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?',
+    [hash, userId],
+  )
 
   return res.json({ changed: true, userId })
 })
@@ -736,7 +742,7 @@ router.put('/admin/registrations/:id', authenticate, requireAdmin, async (req, r
         return res.status(400).json({ message: 'admin01 is a permanent admin and cannot be demoted.' })
       }
 
-      if (isProtectedAdminUser(existingUser) && field === 'is_active' && !Boolean(req.body[field])) {
+      if (isProtectedAdminUser(existingUser) && field === 'is_active' && !req.body[field]) {
         return res.status(400).json({ message: 'admin01 cannot be disabled.' })
       }
 
@@ -765,6 +771,7 @@ router.put('/admin/registrations/:id', authenticate, requireAdmin, async (req, r
     const hash = await bcrypt.hash(rawPassword, 10)
     updates.push('password_hash = ?')
     values.push(hash)
+    updates.push('session_version = session_version + 1')
   }
 
   if (!updates.length) {

@@ -94,6 +94,45 @@ function AdminPanelPage({ config, onConfigChange, onLogout, username }) {
             Training Platform
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {[
+              {
+                href: '/admin/cohorts',
+                icon: 'groups',
+                title: 'Cohorts & bulk enrolment',
+                subtitle: 'Batches, members and CSV imports',
+                description: 'Create cohorts, manage trainers and trainees, import accounts and enrol whole batches.',
+              },
+              {
+                href: '/admin/compliance',
+                icon: 'fact_check',
+                title: 'Mandatory training',
+                subtitle: 'Requirements & compliance',
+                description: 'Assign required learning by cohort, department or globally and review overdue learners.',
+              },
+              {
+                href: '/admin/reports',
+                icon: 'outbox',
+                title: 'Reports & email delivery',
+                subtitle: 'Exports, reminders and audit',
+                description: 'Review delivery status, run reminders and digests, and export organisational reports.',
+              },
+            ].map((item) => (
+              <div className="rounded-2xl bg-surface-container-lowest shadow-soft p-6 hover:bg-surface-container-high transition-all cursor-pointer" key={item.href}>
+                <a className="block" href={item.href}>
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <span className="material-symbols-outlined text-primary" style={{ fontSize: '32px' }}>{item.icon}</span>
+                      <div>
+                        <h3 className="font-headline text-lg font-bold">{item.title}</h3>
+                        <p className="text-xs text-on-surface-variant">{item.subtitle}</p>
+                      </div>
+                    </div>
+                    <span className="material-symbols-outlined text-on-surface-variant">chevron_right</span>
+                  </div>
+                  <p className="text-sm text-on-surface-variant">{item.description}</p>
+                </a>
+              </div>
+            ))}
             <div className="rounded-2xl bg-surface-container-lowest shadow-soft p-6 hover:bg-surface-container-high transition-all cursor-pointer">
               <a className="block" href="/community">
                 <div className="flex items-start justify-between mb-4">

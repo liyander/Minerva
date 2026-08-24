@@ -2,6 +2,8 @@ import { Router } from 'express'
 import { pool } from '../db/pool.js'
 import { authenticate, requireAdmin } from '../middleware/auth.js'
 import { APPROVAL, ASSIGNABLE_ROLES, normaliseRole, ROLES } from '../config/roles.js'
+import { sendMail } from '../services/mailer.js'
+import { recordAudit } from '../services/audit.js'
 
 const router = Router()
 
@@ -83,6 +85,12 @@ router.put('/users/:id/approval', async (req, res) => {
     return res.status(400).json({ message: 'You cannot change your own approval status' })
   }
 
+  const [userRows] = await pool.query(
+    'SELECT email, first_name, username FROM users WHERE id = ? LIMIT 1',
+    [req.params.id],
+  )
+  if (!userRows.length) return res.status(404).json({ message: 'User not found' })
+
   const [result] = await pool.query(
     `UPDATE users
      SET approval_status = ?, approved_by = ?, approved_at = CURRENT_TIMESTAMP, rejection_reason = ?
@@ -100,6 +108,26 @@ router.put('/users/:id/approval', async (req, res) => {
       ['Account approved', 'Your account has been approved. Welcome aboard.', req.params.id],
     )
   }
+
+  if ([APPROVAL.APPROVED, APPROVAL.REJECTED].includes(status)) {
+    const user = userRows[0]
+    void sendMail({
+      to: user.email,
+      template: status === APPROVAL.APPROVED ? 'accountApproved' : 'accountRejected',
+      data: {
+        name: user.first_name || user.username,
+        reason: status === APPROVAL.REJECTED ? req.body?.reason || '' : undefined,
+      },
+      dedupeKey: `approval:${req.params.id}:${status}:${Date.now()}`,
+    })
+  }
+
+  await recordAudit(req, {
+    action: `user.${status}`,
+    entityType: 'user',
+    entityId: req.params.id,
+    summary: `Changed account approval status to ${status}`,
+  })
 
   return res.json({ updated: true, status })
 })

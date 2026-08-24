@@ -7,7 +7,7 @@ export function signToken(payload) {
   return jwt.sign(payload, env.jwtSecret, { expiresIn: '12h' })
 }
 
-export function authenticate(req, res, next) {
+export async function authenticate(req, res, next) {
   const authHeader = req.headers.authorization || ''
   const [, token] = authHeader.split(' ')
 
@@ -16,10 +16,26 @@ export function authenticate(req, res, next) {
   }
 
   try {
-    req.user = jwt.verify(token, env.jwtSecret)
-    void pool
-      .query('UPDATE users SET last_seen_at = CURRENT_TIMESTAMP WHERE id = ?', [req.user.id])
-      .catch(() => {})
+    const payload = jwt.verify(token, env.jwtSecret)
+    const [rows] = await pool.query(
+      'SELECT username, role, is_active, approval_status, session_version FROM users WHERE id = ? LIMIT 1',
+      [payload.id],
+    )
+    const account = rows[0]
+    if (
+      !account ||
+      !account.is_active ||
+      account.approval_status === 'rejected' ||
+      Number(payload.sessionVersion || 0) !== Number(account.session_version || 0)
+    ) {
+      return res.status(401).json({ message: 'Invalid or expired token' })
+    }
+    req.user = {
+      ...payload,
+      username: account.username,
+      role: account.role === 'operator' ? 'trainee' : account.role,
+    }
+    void pool.query('UPDATE users SET last_seen_at = CURRENT_TIMESTAMP WHERE id = ?', [req.user.id]).catch(() => {})
     return next()
   } catch {
     return res.status(401).json({ message: 'Invalid or expired token' })

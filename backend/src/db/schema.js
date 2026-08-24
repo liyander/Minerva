@@ -36,6 +36,7 @@ export const CORE_TABLE_DDL = `
       is_active BOOLEAN DEFAULT true,
       last_login_at DATETIME NULL,
       last_seen_at DATETIME NULL,
+      session_version INT NOT NULL DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     );
@@ -463,6 +464,7 @@ const COLUMN_MIGRATIONS = [
   ['users', 'is_active', 'BOOLEAN DEFAULT true'],
   ['users', 'last_login_at', 'DATETIME NULL'],
   ['users', 'last_seen_at', 'DATETIME NULL'],
+  ['users', 'session_version', 'INT NOT NULL DEFAULT 0'],
   ['users', 'updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'],
   ['platform_config', 'ai_json', 'JSON NULL'],
   ['platform_config', 'api_json', 'JSON NULL'],

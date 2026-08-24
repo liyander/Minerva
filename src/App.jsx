@@ -31,6 +31,9 @@ import AdminHomepagePage from './pages/admin/AdminHomepagePage'
 import AdminCompetencyPage from './pages/admin/AdminCompetencyPage'
 import AdminStudentMonitorPage from './pages/admin/AdminStudentMonitorPage'
 import AdminStudentStatsPage from './pages/admin/AdminStudentStatsPage'
+import AdminCohortsPage from './pages/admin/AdminCohortsPage'
+import AdminCompliancePage from './pages/admin/AdminCompliancePage'
+import AdminReportsPage from './pages/admin/AdminReportsPage'
 import TrainerWorkspacePage from './pages/trainer/TrainerWorkspacePage'
 import AssessmentEditorPage from './pages/trainer/AssessmentEditorPage'
 import AssessmentResultsPage from './pages/trainer/AssessmentResultsPage'
@@ -67,6 +70,7 @@ import RoadmapPage from './pages/RoadmapPage'
 import LeaderboardPage from './pages/LeaderboardPage'
 import SettingsPage from './pages/SettingsPage'
 import RegistrationPage from './pages/RegistrationPage'
+import { ForgotPasswordPage, ResetPasswordPage } from './pages/PasswordPages'
 import LearningPathDetailPage from './pages/LearningPathDetailPage'
 import EventsPage from './pages/EventsPage'
 import ProjectsPage from './pages/ProjectsPage'
@@ -313,6 +317,8 @@ function App() {
           path="/login"
           element={<LoginPage onLoginSuccess={setAuthSession} />}
         />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route
             path="/register"
             element={<RegistrationPage onRegisterSuccess={setAuthSession} />}
@@ -366,6 +372,9 @@ function App() {
           <Route path="/admin/competencies" element={<AdminCompetencyPage />} />
           <Route path="/admin/students" element={<AdminStudentMonitorPage />} />
           <Route path="/admin/students/:userId" element={<AdminStudentStatsPage />} />
+          <Route path="/admin/cohorts" element={<AdminCohortsPage />} />
+          <Route path="/admin/compliance" element={<AdminCompliancePage />} />
+          <Route path="/admin/reports" element={<AdminReportsPage />} />
           <Route path="/trainer" element={<TrainerWorkspacePage />} />
           <Route path="/trainer/assessments/new" element={<AssessmentEditorPage />} />
           <Route path="/trainer/assessments/:assessmentId" element={<AssessmentEditorPage />} />
