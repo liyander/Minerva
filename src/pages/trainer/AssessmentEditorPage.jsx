@@ -8,6 +8,7 @@ import {
   saveAssessmentQuestions,
   updateAssessment,
 } from '../../services/training'
+import { fetchQuestionBanks } from '../../services/platform'
 
 const emptyQuestion = () => ({
   prompt: '',
@@ -41,9 +42,14 @@ function AssessmentEditorPage() {
     opensAt: '',
     deadline: '',
     isPublished: false,
+    bankId: '',
+    drawCount: 0,
+    shuffleQuestions: false,
+    shuffleOptions: false,
   })
   const [questions, setQuestions] = useState([emptyQuestion()])
   const [subjects, setSubjects] = useState([])
+  const [banks, setBanks] = useState([])
   const [isLoading, setIsLoading] = useState(!isNew)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
@@ -51,8 +57,12 @@ function AssessmentEditorPage() {
 
   const load = useCallback(async () => {
     try {
-      const subjectRows = await fetchAssessmentSubjects()
+      const [subjectRows, bankRows] = await Promise.all([
+        fetchAssessmentSubjects(),
+        fetchQuestionBanks(),
+      ])
       setSubjects(subjectRows)
+      setBanks(bankRows)
 
       if (isNew) return
 
@@ -67,6 +77,10 @@ function AssessmentEditorPage() {
         opensAt: toLocalInput(assessment.opensAt),
         deadline: toLocalInput(assessment.deadline),
         isPublished: Boolean(assessment.isPublished),
+        bankId: assessment.bankId || '',
+        drawCount: Number(assessment.drawCount || 0),
+        shuffleQuestions: Boolean(assessment.shuffleQuestions),
+        shuffleOptions: Boolean(assessment.shuffleOptions),
       })
       setQuestions(
         assessment.questions?.length
@@ -115,6 +129,16 @@ function AssessmentEditorPage() {
     if (!form.title.trim()) return 'Give the questionnaire a title.'
     if (!form.subject.trim()) return 'Choose a subject.'
 
+    if (form.bankId) {
+      const bank = banks.find((item) => Number(item.id) === Number(form.bankId))
+      if (!bank) return 'Choose a valid question bank.'
+      if (Number(form.drawCount) < 1) return 'Choose how many questions to draw.'
+      if (Number(form.drawCount) > Number(bank.itemCount)) {
+        return `This bank only contains ${bank.itemCount} questions.`
+      }
+      return ''
+    }
+
     for (const [index, question] of questions.entries()) {
       if (!question.prompt.trim()) return `Question ${index + 1} needs a prompt.`
       const filled = question.options.filter((option) => option.trim())
@@ -149,13 +173,21 @@ function AssessmentEditorPage() {
       if (!isNew) await updateAssessment(id, payload)
 
       // Options are trimmed so blank slots do not become real answers.
-      await saveAssessmentQuestions(
-        id,
-        questions.map((question) => ({
-          ...question,
-          options: question.options.filter((option) => option.trim()),
-        })),
-      )
+      if (!form.bankId) {
+        await saveAssessmentQuestions(
+          id,
+          questions.map((question) => {
+            const options = question.options
+              .map((option, originalIndex) => ({ option: option.trim(), originalIndex }))
+              .filter((entry) => entry.option)
+            return {
+              ...question,
+              options: options.map((entry) => entry.option),
+              correctIndex: options.findIndex((entry) => entry.originalIndex === question.correctIndex),
+            }
+          }),
+        )
+      }
 
       setNotice('Saved.')
       if (isNew) {
@@ -315,6 +347,32 @@ function AssessmentEditorPage() {
         </section>
 
         <section className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft space-y-4">
+          <div>
+            <h2 className="font-headline text-lg font-extrabold text-on-background">Question source and randomisation</h2>
+            <p className="mt-1 font-body text-xs text-on-surface-variant">Use questions written below, or draw a different paper from a reusable bank on every attempt.</p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="font-headline text-xs font-bold text-on-surface-variant">Question bank</span>
+              <select className={fieldClass} onChange={(event) => setForm((current) => ({ ...current, bankId: event.target.value, drawCount: event.target.value ? current.drawCount || 1 : 0 }))} value={form.bankId}>
+                <option value="">Use questions in this assessment</option>
+                {banks.map((bank) => <option key={bank.id} value={bank.id}>{bank.title} ({bank.itemCount})</option>)}
+              </select>
+            </label>
+            {form.bankId ? (
+              <label className="block">
+                <span className="font-headline text-xs font-bold text-on-surface-variant">Questions per attempt</span>
+                <input className={fieldClass} max={banks.find((bank) => Number(bank.id) === Number(form.bankId))?.itemCount || undefined} min="1" onChange={(event) => setForm((current) => ({ ...current, drawCount: Number(event.target.value) }))} type="number" value={form.drawCount} />
+              </label>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap gap-5">
+            <label className="flex items-center gap-3"><input checked={form.shuffleQuestions} className="h-4 w-4 rounded" onChange={(event) => setForm((current) => ({ ...current, shuffleQuestions: event.target.checked }))} type="checkbox" /><span className="font-body text-sm text-on-surface">Shuffle question order</span></label>
+            <label className="flex items-center gap-3"><input checked={form.shuffleOptions} className="h-4 w-4 rounded" onChange={(event) => setForm((current) => ({ ...current, shuffleOptions: event.target.checked }))} type="checkbox" /><span className="font-body text-sm text-on-surface">Shuffle answer options</span></label>
+          </div>
+        </section>
+
+        {!form.bankId ? <section className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="font-headline text-lg font-extrabold text-on-background">
               Questions ({questions.length})
@@ -437,7 +495,13 @@ function AssessmentEditorPage() {
               </div>
             </article>
           ))}
-        </section>
+        </section> : (
+          <section className="rounded-3xl bg-mint p-6 text-on-mint">
+            <h2 className="font-headline text-lg font-extrabold">Bank-powered assessment</h2>
+            <p className="mt-1 font-body text-sm">Each attempt draws {form.drawCount} question(s) from the selected bank. Edit the reusable questions from Question banks.</p>
+            <button className={`${pill} mt-4 bg-surface-container-lowest text-on-surface`} onClick={() => navigate('/trainer/question-banks')} type="button">Manage question banks</button>
+          </section>
+        )}
 
         <div className="flex flex-wrap gap-3 pb-8">
           <button

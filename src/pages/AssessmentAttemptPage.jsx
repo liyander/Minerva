@@ -30,14 +30,18 @@ function AssessmentAttemptPage() {
     setIsSubmitting(true)
     setError('')
     try {
-      setResult(await submitAssessment(assessmentId, answers))
+      const paper = (assessment?.questions || []).map((question) => ({
+        questionId: question.id,
+        optionOrder: question.optionOrder,
+      }))
+      setResult(await submitAssessment(assessmentId, answers, paper))
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (submitError) {
       setError(submitError?.message || 'Could not submit your answers.')
     } finally {
       setIsSubmitting(false)
     }
-  }, [answers, assessmentId, isSubmitting, result])
+  }, [answers, assessment, assessmentId, isSubmitting, result])
 
   submitRef.current = handleSubmit
 

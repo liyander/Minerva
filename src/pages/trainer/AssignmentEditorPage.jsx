@@ -5,7 +5,9 @@ import FileDropField from '../../components/FileDropField'
 import { fetchAssessmentSubjects } from '../../services/training'
 import {
   createAssignment,
+  createRubricTemplate,
   fetchAssignment,
+  fetchRubricTemplates,
   saveRubric,
   updateAssignment,
 } from '../../services/platform'
@@ -13,6 +15,7 @@ import {
 const KINDS = [
   { value: 'file', label: 'File upload', icon: 'upload_file' },
   { value: 'text', label: 'Written answer', icon: 'edit_note' },
+  { value: 'code', label: 'Source code', icon: 'code' },
   { value: 'link', label: 'Link', icon: 'link' },
   { value: 'any', label: 'Any of these', icon: 'all_inclusive' },
 ]
@@ -45,6 +48,8 @@ function AssignmentEditorPage() {
   })
   const [criteria, setCriteria] = useState([emptyCriterion()])
   const [attachment, setAttachment] = useState(null)
+  const [rubricTemplates, setRubricTemplates] = useState([])
+  const [templateName, setTemplateName] = useState('')
   const [subjects, setSubjects] = useState([])
   const [isLoading, setIsLoading] = useState(!isNew)
   const [busy, setBusy] = useState(false)
@@ -53,7 +58,12 @@ function AssignmentEditorPage() {
 
   const load = useCallback(async () => {
     try {
-      setSubjects(await fetchAssessmentSubjects())
+      const [subjectRows, templateRows] = await Promise.all([
+        fetchAssessmentSubjects(),
+        fetchRubricTemplates(),
+      ])
+      setSubjects(subjectRows)
+      setRubricTemplates(templateRows)
       if (isNew) return
 
       const data = await fetchAssignment(assignmentId)
@@ -126,7 +136,7 @@ function AssignmentEditorPage() {
       opensAt: form.opensAt || null,
       deadline: form.deadline || null,
       maxScore: rubricTotal || 100,
-      ...(attachment?.id && isNew ? {} : {}),
+      attachmentFileId: attachment?.id || null,
     }
 
     try {
@@ -140,6 +150,22 @@ function AssignmentEditorPage() {
       setError(saveError?.message || 'Could not save the assignment.')
     } finally {
       setBusy(false)
+    }
+  }
+
+  const saveTemplate = async () => {
+    const filled = criteria.filter((row) => row.label.trim())
+    if (!templateName.trim() || !filled.length) {
+      setError('Give the rubric template a name and add at least one criterion.')
+      return
+    }
+    try {
+      await createRubricTemplate({ title: templateName.trim(), subject: form.subject || null, criteria: filled })
+      setRubricTemplates(await fetchRubricTemplates())
+      setTemplateName('')
+      setNotice('Rubric template saved for reuse.')
+    } catch (templateError) {
+      setError(templateError?.message || 'Could not save the rubric template.')
     }
   }
 
@@ -339,6 +365,25 @@ function AssignmentEditorPage() {
             >
               Add criterion
             </button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 rounded-2xl bg-surface-container p-4 lg:grid-cols-[1fr_auto_1fr_auto] lg:items-end">
+            <label className="block">
+              <span className="font-headline text-xs font-bold text-on-surface-variant">Reuse a rubric template</span>
+              <select className={fieldClass} defaultValue="" onChange={(event) => {
+                const template = rubricTemplates.find((item) => Number(item.id) === Number(event.target.value))
+                if (template) setCriteria(template.criteria.map((criterion) => ({ ...criterion })))
+              }}>
+                <option value="">Choose template</option>
+                {rubricTemplates.map((template) => <option key={template.id} value={template.id}>{template.title}</option>)}
+              </select>
+            </label>
+            <span className="hidden pb-3 font-body text-xs text-on-surface-variant lg:block">or</span>
+            <label className="block">
+              <span className="font-headline text-xs font-bold text-on-surface-variant">Save current rubric for reuse</span>
+              <input className={fieldClass} onChange={(event) => setTemplateName(event.target.value)} placeholder="Template name" value={templateName} />
+            </label>
+            <button className={`${pill} bg-secondary-container text-on-secondary-container`} onClick={saveTemplate} type="button">Save template</button>
           </div>
 
           {criteria.map((criterion, index) => (

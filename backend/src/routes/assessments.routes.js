@@ -144,7 +144,10 @@ router.get('/', async (req, res) => {
   const [rows] = await pool.query(
     `SELECT a.*, u.username AS creator_username, u.first_name AS creator_first_name,
             r.title AS course_title,
-            (SELECT COUNT(*) FROM assessment_questions q WHERE q.assessment_id = a.id) AS question_count,
+            CASE WHEN a.bank_id IS NOT NULL
+              THEN (SELECT COUNT(*) FROM question_bank_items q WHERE q.bank_id = a.bank_id)
+              ELSE (SELECT COUNT(*) FROM assessment_questions q WHERE q.assessment_id = a.id)
+            END AS question_count,
             (SELECT COUNT(*) FROM assessment_attempts t WHERE t.assessment_id = a.id AND t.submitted_at IS NOT NULL) AS attempt_count
      FROM assessments a
      LEFT JOIN users u ON u.id = a.created_by
@@ -423,12 +426,24 @@ router.post('/:id/attempts', async (req, res) => {
   let questions
   if (paper?.length) {
     const ids = paper.map((entry) => Number(entry.questionId)).filter(Number.isFinite)
-    if (!ids.length) {
+    if (!ids.length || new Set(ids).size !== ids.length) {
       return res.status(400).json({ message: 'The submitted paper is malformed' })
+    }
+    const [countRows] = await pool.query(
+      `SELECT COUNT(*) AS count FROM ${source}
+       WHERE ${assessment.bank_id ? 'bank_id' : 'assessment_id'} = ?`,
+      [assessment.bank_id || assessment.id],
+    )
+    const availableCount = Number(countRows[0]?.count || 0)
+    const expectedCount = assessment.draw_count > 0
+      ? Math.min(Number(assessment.draw_count), availableCount)
+      : availableCount
+    if (ids.length !== expectedCount) {
+      return res.status(400).json({ message: 'The submitted paper has the wrong number of questions' })
     }
 
     const [rows] = await pool.query(
-      `SELECT id, correct_index, explanation, marks FROM ${source} WHERE id IN (?)`,
+      `SELECT id, prompt, options_json, correct_index, explanation, marks FROM ${source} WHERE id IN (?)`,
       [ids],
     )
     const byId = new Map(rows.map((row) => [Number(row.id), row]))
@@ -438,18 +453,25 @@ router.post('/:id/attempts', async (req, res) => {
         const row = byId.get(Number(entry.questionId))
         if (!row) return null
         // Map the displayed option index back to the stored one.
-        const order = Array.isArray(entry.optionOrder) ? entry.optionOrder : null
+        const order = Array.isArray(entry.optionOrder) ? entry.optionOrder.map(Number) : null
+        const optionCount = parseOptions(row.options_json).length
+        const validOrder = order
+          && order.length === optionCount
+          && new Set(order).size === optionCount
+          && order.every((value) => Number.isInteger(value) && value >= 0 && value < optionCount)
+        if (!validOrder) return null
         return {
           ...row,
-          displayCorrectIndex: order
-            ? order.indexOf(Number(row.correct_index))
-            : Number(row.correct_index),
+          displayCorrectIndex: order.indexOf(Number(row.correct_index)),
         }
       })
       .filter(Boolean)
+    if (questions.length !== ids.length) {
+      return res.status(400).json({ message: 'The submitted paper contains an invalid question' })
+    }
   } else {
     const [rows] = await pool.query(
-      `SELECT id, correct_index, explanation, marks FROM ${source}
+      `SELECT id, prompt, options_json, correct_index, explanation, marks FROM ${source}
        WHERE ${assessment.bank_id ? 'bank_id' : 'assessment_id'} = ?
        ORDER BY id`,
       [assessment.bank_id || assessment.id],
@@ -483,12 +505,33 @@ router.post('/:id/attempts', async (req, res) => {
 
   const percentage = maxScore ? Math.round((score / maxScore) * 100) : 0
   const passed = percentage >= Number(assessment.pass_percentage || 0)
+  const paperSnapshot = questions.map((question) => {
+    const submittedPaper = paper?.find((entry) => Number(entry.questionId) === Number(question.id))
+    const storedOptions = parseOptions(question.options_json)
+    const optionOrder = submittedPaper?.optionOrder || storedOptions.map((_, index) => index)
+    return {
+      questionId: question.id,
+      prompt: question.prompt,
+      options: optionOrder.map((originalIndex) => storedOptions[originalIndex]),
+      optionOrder,
+    }
+  })
 
   const [result] = await pool.query(
     `INSERT INTO assessment_attempts
-       (assessment_id, user_id, score, max_score, percentage, passed, answers_json, submitted_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-    [assessment.id, req.user.id, score, maxScore, percentage, passed, JSON.stringify(breakdown)],
+       (assessment_id, user_id, score, max_score, percentage, passed, answers_json,
+        question_order_json, submitted_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+    [
+      assessment.id,
+      req.user.id,
+      score,
+      maxScore,
+      percentage,
+      passed,
+      JSON.stringify(breakdown),
+      JSON.stringify(paperSnapshot),
+    ],
   )
 
   return res.status(201).json({ attemptId: result.insertId, score, maxScore, percentage, passed, breakdown })
@@ -518,6 +561,7 @@ router.get('/:id/results', requireTrainer, async (req, res) => {
 
   const [rows] = await pool.query(
     `SELECT t.id, t.user_id, t.score, t.max_score, t.percentage, t.passed, t.submitted_at,
+            t.answers_json, t.question_order_json,
             u.username, u.first_name, u.last_name, u.email
      FROM assessment_attempts t
      JOIN users u ON u.id = t.user_id
@@ -539,7 +583,13 @@ router.get('/:id/results', requireTrainer, async (req, res) => {
         ? Math.round(percentages.reduce((sum, value) => sum + value, 0) / percentages.length)
         : 0,
     },
-    attempts: rows,
+    attempts: rows.map((row) => ({
+      ...row,
+      answers: (() => { try { return JSON.parse(row.answers_json || '[]') } catch { return [] } })(),
+      paper: (() => { try { return JSON.parse(row.question_order_json || '[]') } catch { return [] } })(),
+      answers_json: undefined,
+      question_order_json: undefined,
+    })),
   })
 })
 

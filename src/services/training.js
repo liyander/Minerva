@@ -31,8 +31,8 @@ export const updateAssessment = (id, payload) =>
 export const deleteAssessment = (id) => apiFetch(`/assessments/${id}`, { method: 'DELETE' })
 export const saveAssessmentQuestions = (id, questions) =>
   apiFetch(`/assessments/${id}/questions`, { method: 'PUT', ...json({ questions }) })
-export const submitAssessment = (id, answers) =>
-  apiFetch(`/assessments/${id}/attempts`, { method: 'POST', ...json({ answers }) })
+export const submitAssessment = (id, answers, paper) =>
+  apiFetch(`/assessments/${id}/attempts`, { method: 'POST', ...json({ answers, paper }) })
 export const fetchMyAttempts = () => apiFetch('/assessments/attempts/me')
 export const fetchAssessmentResults = (id) => apiFetch(`/assessments/${id}/results`)
 

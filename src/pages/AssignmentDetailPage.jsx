@@ -92,7 +92,8 @@ function AssignmentDetailPage() {
   const locked = graded && !assignment.allowResubmission
   const closed = assignment.pastDeadline && !assignment.lateSubmission
   const wantsFile = ['file', 'any'].includes(assignment.submissionKind)
-  const wantsText = ['text', 'any'].includes(assignment.submissionKind)
+  const wantsText = ['text', 'code', 'any'].includes(assignment.submissionKind)
+  const wantsCode = assignment.submissionKind === 'code'
   const wantsLink = ['link', 'any'].includes(assignment.submissionKind)
 
   const rubricScoreFor = (criterionId) =>
@@ -234,6 +235,26 @@ function AssignmentDetailPage() {
           </section>
         ) : null}
 
+        {submission?.history?.length ? (
+          <section className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft">
+            <h2 className="font-headline text-lg font-extrabold text-on-background">Submission history</h2>
+            <p className="mt-1 font-body text-xs text-on-surface-variant">Earlier attempts remain available after resubmission, including their marks and feedback.</p>
+            <div className="mt-4 space-y-3">
+              {submission.history.map((attempt) => (
+                <details className="rounded-2xl bg-surface-container p-4" key={attempt.id}>
+                  <summary className="cursor-pointer list-none font-headline text-sm font-bold text-on-surface">
+                    Attempt {attempt.attemptNumber} · {attempt.status === 'graded' ? `${attempt.score}/${assignment.maxScore}` : 'Submitted'} · {new Date(attempt.submittedAt).toLocaleString()}
+                  </summary>
+                  {attempt.feedback ? <p className="mt-3 font-body text-sm text-on-surface-variant"><strong>Feedback:</strong> {attempt.feedback}</p> : null}
+                  {attempt.bodyText ? <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap rounded-xl bg-surface-container-high p-3 font-mono text-xs text-on-surface">{attempt.bodyText}</pre> : null}
+                  {attempt.linkUrl ? <a className="mt-3 block text-sm font-bold text-primary underline" href={attempt.linkUrl} rel="noreferrer" target="_blank">Open submitted link</a> : null}
+                  {attempt.fileId ? <a className="mt-3 block text-sm font-bold text-primary underline" href={fileUrl(attempt.fileId, { download: true })} rel="noreferrer" target="_blank">Download submitted file</a> : null}
+                </details>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
         {notice ? (
           <div className="rounded-2xl bg-mint p-4">
             <p className="font-body text-sm text-on-mint">{notice}</p>
@@ -272,12 +293,12 @@ function AssignmentDetailPage() {
               {wantsText ? (
                 <label className="block">
                   <span className="font-headline text-xs font-bold text-on-surface-variant">
-                    Your answer
+                    {wantsCode ? 'Source code' : 'Your answer'}
                   </span>
                   <textarea
-                    className={fieldClass}
+                    className={`${fieldClass} ${wantsCode ? 'font-mono' : ''}`}
                     onChange={(e) => setBodyText(e.target.value)}
-                    placeholder="Write your response here."
+                    placeholder={wantsCode ? 'Paste or write your source code here.' : 'Write your response here.'}
                     rows={8}
                     value={bodyText}
                   />

@@ -10,7 +10,7 @@ const router = Router()
 
 router.use(authenticate)
 
-const SUBMISSION_KINDS = ['file', 'text', 'link', 'any']
+const SUBMISSION_KINDS = ['file', 'text', 'code', 'link', 'any']
 
 function toMysqlDate(value) {
   if (!value) return null
@@ -126,6 +126,73 @@ router.get('/', async (req, res) => {
   )
 })
 
+/** Reusable rubric templates owned by the trainer. */
+router.get('/rubric-templates', requireTrainer, async (req, res) => {
+  const [templates] = await pool.query(
+    `SELECT * FROM rubric_templates WHERE owner_id = ? ORDER BY updated_at DESC, title ASC`,
+    [req.user.id],
+  )
+  if (!templates.length) return res.json([])
+  const [criteria] = await pool.query(
+    `SELECT * FROM rubric_template_criteria WHERE template_id IN (?) ORDER BY sort_order, id`,
+    [templates.map((template) => template.id)],
+  )
+  return res.json(templates.map((template) => ({
+    id: template.id,
+    title: template.title,
+    subject: template.subject,
+    criteria: criteria.filter((row) => Number(row.template_id) === Number(template.id)).map((row) => ({
+      label: row.label,
+      description: row.description || '',
+      maxPoints: Number(row.max_points),
+    })),
+  })))
+})
+
+router.post('/rubric-templates', requireTrainer, async (req, res) => {
+  const title = String(req.body?.title || '').trim()
+  const criteria = Array.isArray(req.body?.criteria) ? req.body.criteria : []
+  if (!title) return res.status(400).json({ message: 'Template title is required' })
+  if (!criteria.length) return res.status(400).json({ message: 'Add at least one rubric criterion' })
+  for (const [index, criterion] of criteria.entries()) {
+    if (!String(criterion.label || '').trim() || Number(criterion.maxPoints) <= 0) {
+      return res.status(400).json({ message: `Criterion ${index + 1} is invalid` })
+    }
+  }
+
+  const connection = await pool.getConnection()
+  try {
+    await connection.beginTransaction()
+    const [result] = await connection.query(
+      'INSERT INTO rubric_templates (owner_id, title, subject) VALUES (?, ?, ?)',
+      [req.user.id, title, req.body?.subject || null],
+    )
+    for (const [index, criterion] of criteria.entries()) {
+      await connection.query(
+        `INSERT INTO rubric_template_criteria
+           (template_id, label, description, max_points, sort_order) VALUES (?, ?, ?, ?, ?)`,
+        [result.insertId, String(criterion.label).trim(), criterion.description || null, Number(criterion.maxPoints), index],
+      )
+    }
+    await connection.commit()
+    return res.status(201).json({ id: result.insertId })
+  } catch (error) {
+    await connection.rollback()
+    throw error
+  } finally {
+    connection.release()
+  }
+})
+
+router.delete('/rubric-templates/:templateId', requireTrainer, async (req, res) => {
+  const [result] = await pool.query(
+    'DELETE FROM rubric_templates WHERE id = ? AND owner_id = ?',
+    [req.params.templateId, req.user.id],
+  )
+  if (!result.affectedRows) return res.status(404).json({ message: 'Rubric template not found' })
+  return res.json({ deleted: true })
+})
+
 router.get('/:id', async (req, res) => {
   const assignment = await loadAssignment(req.params.id)
   if (!assignment) return res.status(404).json({ message: 'Assignment not found' })
@@ -143,12 +210,32 @@ router.get('/:id', async (req, res) => {
   )
 
   let rubricScores = []
+  let submissionHistory = []
   if (submissionRows.length) {
     const [scoreRows] = await pool.query(
       'SELECT criterion_id, points, comment FROM assignment_rubric_scores WHERE submission_id = ?',
       [submissionRows[0].id],
     )
     rubricScores = scoreRows
+    const [historyRows] = await pool.query(
+      `SELECT * FROM assignment_submission_history
+       WHERE assignment_id = ? AND user_id = ? ORDER BY attempt_number DESC`,
+      [assignment.id, req.user.id],
+    )
+    submissionHistory = historyRows.map((row) => ({
+      id: row.id,
+      attemptNumber: Number(row.attempt_number),
+      status: row.status,
+      submittedAt: row.submitted_at,
+      score: row.score,
+      passed: row.passed === null ? null : Boolean(row.passed),
+      feedback: row.feedback,
+      gradedAt: row.graded_at,
+      bodyText: row.body_text,
+      linkUrl: row.link_url,
+      fileId: row.file_id,
+      rubricScores: (() => { try { return JSON.parse(row.rubric_scores_json || '[]') } catch { return [] } })(),
+    }))
   }
 
   return res.json({
@@ -181,6 +268,7 @@ router.get('/:id', async (req, res) => {
           linkUrl: submissionRows[0].link_url,
           fileId: submissionRows[0].file_id,
           status: submissionRows[0].status,
+          attemptNumber: Number(submissionRows[0].attempt_number),
           isLate: Boolean(submissionRows[0].is_late),
           score: submissionRows[0].score,
           passed: submissionRows[0].passed === null ? null : Boolean(submissionRows[0].passed),
@@ -188,6 +276,7 @@ router.get('/:id', async (req, res) => {
           gradedAt: submissionRows[0].graded_at,
           submittedAt: submissionRows[0].submitted_at,
           rubricScores,
+          history: submissionHistory,
         }
       : null,
   })
@@ -205,7 +294,7 @@ router.post('/', requireTrainer, async (req, res) => {
     ? req.body.submissionKind
     : 'file'
 
-  let attachmentFileId = null
+  let attachmentFileId = req.body?.attachmentFileId || null
   if (req.body?.attachmentDataUrl) {
     const stored = await putDataUrl({
       dataUrl: req.body.attachmentDataUrl,
@@ -271,6 +360,7 @@ router.put('/:id', requireTrainer, async (req, res) => {
     deadline: req.body?.deadline !== undefined ? toMysqlDate(req.body.deadline) : undefined,
     late_submission: req.body?.lateSubmission,
     is_published: req.body?.isPublished,
+    attachment_file_id: req.body?.attachmentFileId,
   }
 
   const updates = Object.entries(fields).filter(([, value]) => value !== undefined)
@@ -376,7 +466,7 @@ router.post('/:id/submissions', async (req, res) => {
   }
 
   const [existing] = await pool.query(
-    'SELECT id, status, attempt_number FROM assignment_submissions WHERE assignment_id = ? AND user_id = ? LIMIT 1',
+    'SELECT * FROM assignment_submissions WHERE assignment_id = ? AND user_id = ? LIMIT 1',
     [assignment.id, req.user.id],
   )
 
@@ -405,6 +495,9 @@ router.post('/:id/submissions', async (req, res) => {
   if (kind === 'text' && !bodyText) {
     return res.status(400).json({ message: 'Write your answer to submit' })
   }
+  if (kind === 'code' && !bodyText) {
+    return res.status(400).json({ message: 'Add your source code to submit' })
+  }
   if (kind === 'link' && !linkUrl) {
     return res.status(400).json({ message: 'Provide a link to submit' })
   }
@@ -414,25 +507,50 @@ router.post('/:id/submissions', async (req, res) => {
 
   const attemptNumber = existing.length ? Number(existing[0].attempt_number) + 1 : 1
 
-  await pool.query(
-    `INSERT INTO assignment_submissions
-       (assignment_id, user_id, body_text, link_url, file_id, status, is_late, attempt_number, submitted_at)
-     VALUES (?, ?, ?, ?, ?, 'submitted', ?, ?, CURRENT_TIMESTAMP)
-     ON DUPLICATE KEY UPDATE
-       body_text = VALUES(body_text),
-       link_url = VALUES(link_url),
-       file_id = VALUES(file_id),
-       status = 'submitted',
-       is_late = VALUES(is_late),
-       attempt_number = VALUES(attempt_number),
-       submitted_at = CURRENT_TIMESTAMP,
-       score = NULL,
-       passed = NULL,
-       feedback = NULL,
-       graded_by = NULL,
-       graded_at = NULL`,
-    [assignment.id, req.user.id, bodyText, linkUrl, fileId, pastDeadline, attemptNumber],
-  )
+  const connection = await pool.getConnection()
+  try {
+    await connection.beginTransaction()
+    if (existing.length) {
+      const previous = existing[0]
+      const [previousScores] = await connection.query(
+        `SELECT criterion_id AS criterionId, points, comment
+         FROM assignment_rubric_scores WHERE submission_id = ?`,
+        [previous.id],
+      )
+      await connection.query(
+        `INSERT INTO assignment_submission_history
+           (original_submission_id, assignment_id, user_id, body_text, link_url, file_id,
+            status, is_late, attempt_number, submitted_at, score, passed, feedback,
+            graded_by, graded_at, rubric_scores_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          previous.id, previous.assignment_id, previous.user_id, previous.body_text,
+          previous.link_url, previous.file_id, previous.status, previous.is_late,
+          previous.attempt_number, previous.submitted_at, previous.score, previous.passed,
+          previous.feedback, previous.graded_by, previous.graded_at, JSON.stringify(previousScores),
+        ],
+      )
+      await connection.query('DELETE FROM assignment_rubric_scores WHERE submission_id = ?', [previous.id])
+    }
+
+    await connection.query(
+      `INSERT INTO assignment_submissions
+         (assignment_id, user_id, body_text, link_url, file_id, status, is_late, attempt_number, submitted_at)
+       VALUES (?, ?, ?, ?, ?, 'submitted', ?, ?, CURRENT_TIMESTAMP)
+       ON DUPLICATE KEY UPDATE
+         body_text = VALUES(body_text), link_url = VALUES(link_url), file_id = VALUES(file_id),
+         status = 'submitted', is_late = VALUES(is_late), attempt_number = VALUES(attempt_number),
+         submitted_at = CURRENT_TIMESTAMP, score = NULL, passed = NULL, feedback = NULL,
+         graded_by = NULL, graded_at = NULL`,
+      [assignment.id, req.user.id, bodyText, linkUrl, fileId, pastDeadline, attemptNumber],
+    )
+    await connection.commit()
+  } catch (error) {
+    await connection.rollback()
+    throw error
+  } finally {
+    connection.release()
+  }
 
   return res.status(201).json({ submitted: true, isLate: pastDeadline, attemptNumber })
 })

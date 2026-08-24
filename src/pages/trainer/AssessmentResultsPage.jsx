@@ -9,6 +9,7 @@ function AssessmentResultsPage() {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
+  const [reviewAttempt, setReviewAttempt] = useState(null)
 
   useEffect(() => {
     fetchAssessmentResults(assessmentId)
@@ -82,10 +83,10 @@ function AssessmentResultsPage() {
               <table className="w-full min-w-[32rem]">
                 <thead>
                   <tr className="text-left">
-                    {['Trainee', 'Score', 'Result', 'Submitted'].map((head) => (
+                    {['Trainee', 'Score', 'Result', 'Submitted', ''].map((head, index) => (
                       <th
                         className="font-headline text-xs font-bold text-on-surface-variant pb-3 px-3"
-                        key={head}
+                        key={`${head}-${index}`}
                       >
                         {head}
                       </th>
@@ -117,6 +118,7 @@ function AssessmentResultsPage() {
                       <td className="py-3 px-3 font-body text-xs text-on-surface-variant">
                         {new Date(attempt.submitted_at).toLocaleString()}
                       </td>
+                      <td className="py-3 px-3"><button className="rounded-full bg-surface-container-high px-3 py-1.5 font-headline text-xs font-bold text-on-surface" onClick={() => setReviewAttempt(attempt)} type="button">Review paper</button></td>
                     </tr>
                   ))}
                 </tbody>
@@ -124,6 +126,18 @@ function AssessmentResultsPage() {
             </div>
           )}
         </section>
+
+        {reviewAttempt ? (
+          <section className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft">
+            <div className="flex items-center justify-between gap-3"><div><h2 className="font-headline text-lg font-extrabold text-on-background">Attempt review</h2><p className="font-body text-xs text-on-surface-variant">The exact question and option order shown for this attempt.</p></div><button className="rounded-full bg-surface-container-high px-4 py-2 font-headline text-xs font-bold" onClick={() => setReviewAttempt(null)} type="button">Close</button></div>
+            <div className="mt-4 space-y-3">
+              {(reviewAttempt.paper || []).map((question, index) => {
+                const answer = (reviewAttempt.answers || []).find((item) => Number(item.questionId) === Number(question.questionId))
+                return <article className="rounded-2xl bg-surface-container p-4" key={`${question.questionId}-${index}`}><p className="font-headline text-sm font-extrabold text-on-surface">{index + 1}. {question.prompt}</p><div className="mt-3 space-y-2">{(question.options || []).map((option, optionIndex) => <div className={`rounded-xl px-3 py-2 font-body text-xs ${optionIndex === answer?.correctIndex ? 'bg-mint text-on-mint' : optionIndex === answer?.chosenIndex ? 'bg-blush text-on-blush' : 'bg-surface-container-lowest text-on-surface-variant'}`} key={optionIndex}>{option}{optionIndex === answer?.correctIndex ? ' · correct' : optionIndex === answer?.chosenIndex ? ' · selected' : ''}</div>)}</div></article>
+              })}
+            </div>
+          </section>
+        ) : null}
       </div>
     </main>
   )

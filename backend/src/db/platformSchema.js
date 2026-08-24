@@ -83,6 +83,27 @@ export const PLATFORM_TABLE_DDL = `
     FOREIGN KEY (assignment_id) REFERENCES assignments(id) ON DELETE CASCADE
   );
 
+  CREATE TABLE IF NOT EXISTS rubric_templates (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    owner_id INT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    subject VARCHAR(120) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_rubric_template_owner (owner_id, subject),
+    FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS rubric_template_criteria (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    template_id BIGINT NOT NULL,
+    label VARCHAR(255) NOT NULL,
+    description TEXT,
+    max_points INT NOT NULL DEFAULT 10,
+    sort_order INT DEFAULT 0,
+    FOREIGN KEY (template_id) REFERENCES rubric_templates(id) ON DELETE CASCADE
+  );
+
   CREATE TABLE IF NOT EXISTS assignment_submissions (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     assignment_id BIGINT NOT NULL,
@@ -116,6 +137,33 @@ export const PLATFORM_TABLE_DDL = `
     UNIQUE KEY uniq_rubric_score (submission_id, criterion_id),
     FOREIGN KEY (submission_id) REFERENCES assignment_submissions(id) ON DELETE CASCADE,
     FOREIGN KEY (criterion_id) REFERENCES assignment_rubric_criteria(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS assignment_submission_history (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    original_submission_id BIGINT NULL,
+    assignment_id BIGINT NOT NULL,
+    user_id INT NOT NULL,
+    body_text LONGTEXT,
+    link_url TEXT,
+    file_id VARCHAR(64) NULL,
+    status VARCHAR(20) NOT NULL,
+    is_late BOOLEAN DEFAULT false,
+    attempt_number INT NOT NULL,
+    submitted_at DATETIME NULL,
+    score INT NULL,
+    passed BOOLEAN NULL,
+    feedback LONGTEXT,
+    graded_by INT NULL,
+    graded_at DATETIME NULL,
+    rubric_scores_json LONGTEXT NULL,
+    archived_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_submission_history_user (assignment_id, user_id, attempt_number),
+    FOREIGN KEY (original_submission_id) REFERENCES assignment_submissions(id) ON DELETE SET NULL,
+    FOREIGN KEY (assignment_id) REFERENCES assignments(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (file_id) REFERENCES file_objects(id) ON DELETE SET NULL,
+    FOREIGN KEY (graded_by) REFERENCES users(id) ON DELETE SET NULL
   );
 
   CREATE TABLE IF NOT EXISTS cohorts (
@@ -241,8 +289,11 @@ export const PLATFORM_TABLES = [
   'question_bank_items',
   'assignments',
   'assignment_rubric_criteria',
+  'rubric_templates',
+  'rubric_template_criteria',
   'assignment_submissions',
   'assignment_rubric_scores',
+  'assignment_submission_history',
   'cohorts',
   'cohort_members',
   'training_requirements',

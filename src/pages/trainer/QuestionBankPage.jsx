@@ -109,7 +109,16 @@ function QuestionBankPage() {
     try {
       await saveBankItems(
         activeBank.id,
-        filled.map((item) => ({ ...item, options: item.options.filter((o) => o.trim()) })),
+        filled.map((item) => {
+          const options = item.options
+            .map((option, originalIndex) => ({ option: option.trim(), originalIndex }))
+            .filter((entry) => entry.option)
+          return {
+            ...item,
+            options: options.map((entry) => entry.option),
+            correctIndex: options.findIndex((entry) => entry.originalIndex === item.correctIndex),
+          }
+        }),
       )
       setNotice(`Saved ${filled.length} question(s).`)
       await loadBanks()

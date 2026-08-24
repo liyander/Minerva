@@ -41,6 +41,11 @@ export const updateAssignment = (id, payload) =>
 export const deleteAssignment = (id) => apiFetch(`/assignments/${id}`, { method: 'DELETE' })
 export const saveRubric = (id, criteria) =>
   apiFetch(`/assignments/${id}/rubric`, { method: 'PUT', ...json({ criteria }) })
+export const fetchRubricTemplates = () => apiFetch('/assignments/rubric-templates')
+export const createRubricTemplate = (payload) =>
+  apiFetch('/assignments/rubric-templates', { method: 'POST', ...json(payload) })
+export const deleteRubricTemplate = (id) =>
+  apiFetch(`/assignments/rubric-templates/${id}`, { method: 'DELETE' })
 export const submitAssignment = (id, payload) =>
   apiFetch(`/assignments/${id}/submissions`, { method: 'POST', ...json(payload) })
 export const fetchSubmissions = (id) => apiFetch(`/assignments/${id}/submissions`)

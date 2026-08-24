@@ -11,13 +11,13 @@ This file is the implementation tracker for the next platform features.
 
 ## Assessments and assignments
 
-- [ ] **Assignment and subjective grading**
+- [x] ~~**Assignment and subjective grading**~~
   - Support essay/text, code, link, and file-upload submissions.
   - Let trainers create reusable rubric criteria with configurable scores.
   - Provide a grading queue with rubric scoring, written feedback, pass/fail status, and resubmission controls.
   - Show submission history, feedback, and grades to trainees.
 
-- [ ] **Question banks with randomisation**
+- [x] ~~**Question banks with randomisation**~~
   - Let trainers create and maintain reusable question banks.
   - Allow assessments to draw a configurable random subset per attempt.
   - Support question-order and option-order shuffling.
