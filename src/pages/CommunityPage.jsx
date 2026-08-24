@@ -7,6 +7,7 @@ import {
   createChannel,
   createClassroom,
   createDiscussion,
+  deleteChannel,
   deleteMessage,
   editMessage,
   fetchChannels,
@@ -14,11 +15,13 @@ import {
   fetchClassrooms,
   fetchDiscussion,
   fetchDiscussions,
+  fetchMessageAttachment,
   fetchMessages,
   fetchThread,
   postDiscussionComment,
   postMessage,
   removeClassroomMember,
+  searchMentionableUsers,
   searchUsers,
   toggleReaction,
   updateDiscussion,
@@ -80,16 +83,113 @@ function groupMessagesByDay(messages) {
   return groups
 }
 
-function MessageComposer({ placeholder, onSend, isSending }) {
-  const [text, setText] = useState('')
-  const textareaRef = useRef(null)
+const MAX_MESSAGE_FILE_BYTES = 5 * 1024 * 1024
 
-  const send = () => {
+function MessageBody({ body }) {
+  const parts = String(body || '').split(/(@[a-zA-Z0-9._-]+)/g)
+  return (
+    <p className="font-body text-sm text-on-surface whitespace-pre-wrap break-words mt-0.5">
+      {parts.map((part, index) =>
+        part.startsWith('@') ? (
+          <span className="rounded bg-primary-container px-0.5 font-semibold text-on-primary-container" key={`${part}-${index}`}>
+            {part}
+          </span>
+        ) : part,
+      )}
+    </p>
+  )
+}
+
+function MessageComposer({ channelId, placeholder, onSend, allowStartThread = false }) {
+  const [text, setText] = useState('')
+  const [attachment, setAttachment] = useState(null)
+  const [mentionQuery, setMentionQuery] = useState(null)
+  const [mentionResults, setMentionResults] = useState([])
+  const [isSending, setIsSending] = useState(false)
+  const [error, setError] = useState('')
+  const textareaRef = useRef(null)
+  const fileRef = useRef(null)
+
+  useEffect(() => {
+    if (mentionQuery === null || !channelId) {
+      setMentionResults([])
+      return undefined
+    }
+    let cancelled = false
+    const timeout = window.setTimeout(() => {
+      searchMentionableUsers(channelId, mentionQuery)
+        .then((users) => {
+          if (!cancelled) setMentionResults(users)
+        })
+        .catch(() => {
+          if (!cancelled) setMentionResults([])
+        })
+    }, 180)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timeout)
+    }
+  }, [channelId, mentionQuery])
+
+  const updateText = (value, cursorPosition) => {
+    setText(value)
+    const beforeCursor = value.slice(0, cursorPosition ?? value.length)
+    const match = beforeCursor.match(/(?:^|\s)@([a-zA-Z0-9._-]*)$/)
+    setMentionQuery(match ? match[1] : null)
+  }
+
+  const chooseMention = (user) => {
+    const textarea = textareaRef.current
+    const cursor = textarea?.selectionStart ?? text.length
+    const before = text.slice(0, cursor)
+    const after = text.slice(cursor)
+    const nextBefore = before.replace(/@([a-zA-Z0-9._-]*)$/, `@${user.username} `)
+    const next = nextBefore + after
+    setText(next)
+    setMentionQuery(null)
+    setMentionResults([])
+    window.requestAnimationFrame(() => {
+      textarea?.focus()
+      textarea?.setSelectionRange(nextBefore.length, nextBefore.length)
+    })
+  }
+
+  const chooseFile = (file) => {
+    setError('')
+    if (!file) return
+    if (file.size > MAX_MESSAGE_FILE_BYTES) {
+      setError('Files must be 5 MB or smaller.')
+      if (fileRef.current) fileRef.current.value = ''
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => setAttachment({
+      fileName: file.name,
+      fileType: file.type || 'application/octet-stream',
+      fileSize: file.size,
+      dataUrl: reader.result,
+    })
+    reader.onerror = () => setError('Could not read that file.')
+    reader.readAsDataURL(file)
+  }
+
+  const send = async (startThread = false) => {
     const trimmed = text.trim()
-    if (!trimmed || isSending) return
-    onSend(trimmed)
-    setText('')
-    window.requestAnimationFrame(() => textareaRef.current?.focus())
+    if ((!trimmed && !attachment) || isSending) return
+    setIsSending(true)
+    setError('')
+    try {
+      await onSend(channelId ? { body: trimmed, attachment } : trimmed, { startThread })
+      setText('')
+      setAttachment(null)
+      setMentionQuery(null)
+      if (fileRef.current) fileRef.current.value = ''
+      window.requestAnimationFrame(() => textareaRef.current?.focus())
+    } catch (sendError) {
+      setError(sendError?.message || 'Could not send the message.')
+    } finally {
+      setIsSending(false)
+    }
   }
 
   return (
@@ -97,26 +197,63 @@ function MessageComposer({ placeholder, onSend, isSending }) {
       <textarea
         ref={textareaRef}
         className="w-full resize-none bg-transparent outline-none px-3 py-2 font-body text-sm text-on-surface min-h-[44px] max-h-40"
-        onChange={(event) => setText(event.target.value)}
+        onChange={(event) => updateText(event.target.value, event.target.selectionStart)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault()
-            send()
+            void send()
           }
         }}
         placeholder={placeholder}
         value={text}
       />
-      <div className="flex items-center justify-end px-1 pb-1">
+      {mentionResults.length ? (
+        <div className="mx-1 mb-2 max-h-44 overflow-y-auto rounded-xl border border-outline-variant/40 bg-surface-container-lowest shadow-card">
+          {mentionResults.map((user) => (
+            <button className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-surface-container-high" key={user.id} onClick={() => chooseMention(user)} type="button">
+              <Avatar name={user.name} size={7} />
+              <span className="font-body text-sm text-on-surface">{user.name}</span>
+              <span className="font-body text-xs text-on-surface-variant">@{user.username}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {attachment ? (
+        <div className="mx-1 mb-2 flex items-center justify-between rounded-lg bg-surface-container-high px-3 py-2">
+          <span className="truncate font-body text-xs text-on-surface">{attachment.fileName} · {Math.max(1, Math.ceil(attachment.fileSize / 1024))} KB</span>
+          <button className="text-on-surface-variant" onClick={() => setAttachment(null)} type="button"><span className="material-symbols-outlined text-base">close</span></button>
+        </div>
+      ) : null}
+      {error ? <p className="px-2 pb-2 font-body text-xs text-error">{error}</p> : null}
+      <div className="flex items-center justify-between px-1 pb-1">
+        {channelId ? <div className="flex items-center gap-1">
+          <input className="hidden" onChange={(event) => chooseFile(event.target.files?.[0])} ref={fileRef} type="file" />
+          <button className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high" onClick={() => fileRef.current?.click()} title="Attach file (max 5 MB)" type="button"><span className="material-symbols-outlined text-lg">attach_file</span></button>
+          <button
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high"
+            onClick={() => {
+              const next = `${text}${text && !text.endsWith(' ') ? ' ' : ''}@`
+              updateText(next, next.length)
+              window.requestAnimationFrame(() => textareaRef.current?.focus())
+            }}
+            title="Tag a member"
+            type="button"
+          ><span className="material-symbols-outlined text-lg">alternate_email</span></button>
+        </div> : <span />}
+        <div className="flex items-center gap-2">
+          {allowStartThread ? (
+            <button className="rounded-full px-3 py-2 font-headline text-xs font-bold text-primary hover:bg-primary-container disabled:opacity-50" disabled={(!text.trim() && !attachment) || isSending} onClick={() => void send(true)} type="button">Start thread</button>
+          ) : null}
         <button
           className="rounded-full inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-on-primary font-headline text-xs font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
-          disabled={!text.trim() || isSending}
-          onClick={send}
+          disabled={(!text.trim() && !attachment) || isSending}
+          onClick={() => void send()}
           type="button"
         >
           <span className="material-symbols-outlined text-sm">send</span>
           Send
         </button>
+        </div>
       </div>
     </div>
   )
@@ -149,7 +286,23 @@ function MessageRow({ message, currentUserId, onOpenThread, onToggleReaction, on
   const [showActions, setShowActions] = useState(false)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(message.body)
+  const [isDownloading, setIsDownloading] = useState(false)
   const isMine = message.author?.id === currentUserId
+
+  const downloadAttachment = async () => {
+    setIsDownloading(true)
+    try {
+      const file = await fetchMessageAttachment(message.id)
+      const link = document.createElement('a')
+      link.href = file.dataUrl
+      link.download = file.fileName || 'attachment'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+    } finally {
+      setIsDownloading(false)
+    }
+  }
 
   if (message.deleted) {
     return (
@@ -210,8 +363,24 @@ function MessageRow({ message, currentUserId, onOpenThread, onToggleReaction, on
             </button>
           </div>
         ) : (
-          <p className="font-body text-sm text-on-surface whitespace-pre-wrap break-words mt-0.5">{message.body}</p>
+          <MessageBody body={message.body} />
         )}
+
+        {message.attachment ? (
+          <button
+            className="mt-2 flex max-w-sm items-center gap-3 rounded-xl border border-outline-variant/40 bg-surface-container-low px-3 py-2 text-left hover:bg-surface-container-high"
+            disabled={isDownloading}
+            onClick={() => void downloadAttachment()}
+            type="button"
+          >
+            <span className="material-symbols-outlined text-xl text-primary">description</span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-headline text-xs font-bold text-on-surface">{message.attachment.fileName}</span>
+              <span className="block font-body text-[11px] text-on-surface-variant">{Math.max(1, Math.ceil(message.attachment.fileSize / 1024))} KB</span>
+            </span>
+            <span className="material-symbols-outlined text-lg text-on-surface-variant">{isDownloading ? 'progress_activity' : 'download'}</span>
+          </button>
+        ) : null}
 
         <MessageReactions currentUserId={currentUserId} message={message} onToggle={onToggleReaction} />
 
@@ -233,7 +402,7 @@ function MessageRow({ message, currentUserId, onOpenThread, onToggleReaction, on
 
       {showActions && !editing ? (
         <div className="absolute right-2 top-0 flex items-center gap-0.5 rounded-lg border border-outline-variant/40 bg-surface-container-lowest shadow-soft px-1 py-0.5">
-          {QUICK_EMOJIS.slice(0, 3).map((emoji) => (
+          {QUICK_EMOJIS.map((emoji) => (
             <button
               className="w-7 h-7 rounded hover:bg-surface-container-high text-sm"
               key={emoji}
@@ -338,7 +507,7 @@ function ChatPanel({ channel, messages, currentUserId, isLoading, onSend, onOpen
       </div>
 
       <div className="p-3">
-        <MessageComposer onSend={onSend} placeholder={`Send a message to #${channel.name}`} />
+        <MessageComposer allowStartThread channelId={channel.id} onSend={onSend} placeholder={`Send a message to #${channel.name}`} />
       </div>
     </div>
   )
@@ -403,7 +572,7 @@ function ThreadPanel({ channel, threadData, isLoading, currentUserId, onClose, o
       </div>
 
       <div className="p-3">
-        <MessageComposer onSend={onSend} placeholder="Reply in thread…" />
+        <MessageComposer channelId={channel?.id} onSend={onSend} placeholder="Reply in thread…" />
       </div>
     </div>
   )
@@ -809,10 +978,11 @@ function DiscussionsTab({ classroomId, currentUserId, canModerate }) {
   )
 }
 
-function MembersTab({ classroomId, canManage }) {
+function MembersTab({ classroomId, canManage, currentUserId }) {
   const [classroom, setClassroom] = useState(null)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
+  const [error, setError] = useState('')
 
   const load = useCallback(async () => {
     const data = await fetchClassroom(classroomId)
@@ -843,16 +1013,26 @@ function MembersTab({ classroomId, canManage }) {
     }
   }, [query])
 
-  const addMember = async (userId) => {
-    await addClassroomMember(classroomId, { userId, role: 'student' })
-    setQuery('')
-    setResults([])
-    await load()
+  const addMember = async (userId, role) => {
+    setError('')
+    try {
+      await addClassroomMember(classroomId, { userId, role })
+      setQuery('')
+      setResults([])
+      await load()
+    } catch (actionError) {
+      setError(actionError?.message || 'Could not add that member.')
+    }
   }
 
   const removeMember = async (userId) => {
-    await removeClassroomMember(classroomId, userId)
-    await load()
+    setError('')
+    try {
+      await removeClassroomMember(classroomId, userId)
+      await load()
+    } catch (actionError) {
+      setError(actionError?.message || 'Could not remove that member.')
+    }
   }
 
   return (
@@ -860,6 +1040,7 @@ function MembersTab({ classroomId, canManage }) {
       <p className="font-headline text-base font-extrabold text-on-surface">
         Members {classroom ? `(${classroom.members?.length || 0})` : ''}
       </p>
+      {error ? <p className="mt-2 font-body text-sm text-error">{error}</p> : null}
 
       {canManage ? (
         <div className="relative mt-3">
@@ -872,16 +1053,17 @@ function MembersTab({ classroomId, canManage }) {
           {results.length ? (
             <div className="absolute z-10 mt-1 w-full rounded-xl bg-surface-container-lowest border border-outline-variant/40 shadow-card max-h-56 overflow-y-auto">
               {results.map((user) => (
-                <button
-                  className="w-full flex items-center gap-2 px-4 py-2 hover:bg-surface-container-high text-left"
-                  key={user.id}
-                  onClick={() => addMember(user.id)}
-                  type="button"
-                >
+                <div className="flex items-center gap-2 px-4 py-2 hover:bg-surface-container-high" key={user.id}>
                   <Avatar name={user.name} size={7} />
-                  <span className="font-body text-sm text-on-surface">{user.name}</span>
-                  <span className="font-body text-xs text-on-surface-variant">@{user.username}</span>
-                </button>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-body text-sm text-on-surface">{user.name}</span>
+                    <span className="block font-body text-xs text-on-surface-variant">@{user.username}</span>
+                  </span>
+                  <button className="rounded-full px-2.5 py-1 font-headline text-[10px] font-bold text-primary hover:bg-primary-container" onClick={() => addMember(user.id, 'student')} type="button">Add student</button>
+                  {['trainer', 'admin', 'teacher', 'instructor'].includes(user.role) ? (
+                    <button className="rounded-full px-2.5 py-1 font-headline text-[10px] font-bold text-on-secondary-container hover:bg-secondary-container" onClick={() => addMember(user.id, 'teacher')} type="button">Add teacher</button>
+                  ) : null}
+                </div>
               ))}
             </div>
           ) : null}
@@ -899,15 +1081,20 @@ function MembersTab({ classroomId, canManage }) {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span
-                className={`rounded-full px-2.5 py-0.5 font-headline text-[10px] font-bold ${
-                  member.classroomRole === 'teacher'
-                    ? 'bg-secondary-container text-on-secondary-container'
-                    : 'bg-surface-container-high text-on-surface-variant'
-                }`}
-              >
-                {member.classroomRole}
-              </span>
+              {canManage && member.id !== currentUserId ? (
+                <select
+                  className="rounded-full bg-surface-container-high px-2.5 py-1 font-headline text-[10px] font-bold text-on-surface-variant outline-none"
+                  onChange={(event) => addMember(member.id, event.target.value)}
+                  value={member.classroomRole}
+                >
+                  <option value="student">student</option>
+                  {['trainer', 'admin', 'teacher', 'instructor'].includes(member.role) ? <option value="teacher">teacher</option> : null}
+                </select>
+              ) : (
+                <span className={`rounded-full px-2.5 py-0.5 font-headline text-[10px] font-bold ${member.classroomRole === 'teacher' ? 'bg-secondary-container text-on-secondary-container' : 'bg-surface-container-high text-on-surface-variant'}`}>
+                  {member.classroomRole}
+                </span>
+              )}
               {canManage && member.classroomRole !== 'teacher' ? (
                 <button
                   className="w-7 h-7 rounded-full hover:bg-error/10 text-error inline-flex items-center justify-center"
@@ -1089,15 +1276,16 @@ function CommunityPage() {
     }
   }
 
-  const sendMessage = async (text) => {
+  const sendMessage = async (payload, { startThread = false } = {}) => {
     if (!selectedChannel) return
-    const message = await postMessage(selectedChannel.id, { body: text })
+    const message = await postMessage(selectedChannel.id, payload)
     applyMessageCreated(message)
+    if (startThread) await openThread(message)
   }
 
-  const sendReply = async (text) => {
+  const sendReply = async (payload) => {
     if (!selectedChannel || !threadMessage) return
-    const message = await postMessage(selectedChannel.id, { body: text, parentMessageId: threadMessage.id })
+    const message = await postMessage(selectedChannel.id, { ...payload, parentMessageId: threadMessage.id })
     applyMessageCreated(message)
   }
 
@@ -1115,6 +1303,18 @@ function CommunityPage() {
   const handleDelete = async (messageId) => {
     await deleteMessage(messageId)
     applyMessageDeleted(messageId)
+  }
+
+  const handleDeleteChannel = async (channel) => {
+    if (!window.confirm(`Delete #${channel.name} and all of its messages?`)) return
+    await deleteChannel(channel.id)
+    const remaining = channels.filter((item) => item.id !== channel.id)
+    setChannels(remaining)
+    if (selectedChannel?.id === channel.id) {
+      setSelectedChannel(remaining[0] || null)
+      setThreadMessage(null)
+      setThreadData(null)
+    }
   }
 
   const currentClassroom = space.type === 'classroom' ? space : null
@@ -1166,22 +1366,22 @@ function CommunityPage() {
                 {space.type === 'general' ? (
                   <div className="mt-1 ml-2 space-y-0.5">
                     {channels.map((channel) => (
-                      <button
-                        className={`w-full text-left rounded-lg px-3 py-1.5 font-body text-sm flex items-center gap-1.5 ${
-                          selectedChannel?.id === channel.id
-                            ? 'bg-surface-container-highest text-on-surface font-semibold'
-                            : 'text-on-surface-variant hover:bg-surface-container-high'
-                        }`}
-                        key={channel.id}
-                        onClick={() => {
-                          setSelectedChannel(channel)
-                          setViewMode('chat')
-                        }}
-                        type="button"
-                      >
-                        <span className="text-on-surface-variant">#</span>
-                        {channel.name}
-                      </button>
+                      <div className="group flex items-center" key={channel.id}>
+                        <button
+                          className={`min-w-0 flex-1 text-left rounded-lg px-3 py-1.5 font-body text-sm flex items-center gap-1.5 ${selectedChannel?.id === channel.id ? 'bg-surface-container-highest text-on-surface font-semibold' : 'text-on-surface-variant hover:bg-surface-container-high'}`}
+                          onClick={() => {
+                            setSelectedChannel(channel)
+                            setViewMode('chat')
+                          }}
+                          type="button"
+                        >
+                          <span className="text-on-surface-variant">#</span>
+                          <span className="truncate">{channel.name}</span>
+                        </button>
+                        {session?.role === 'admin' && channel.kind !== 'announcements' ? (
+                          <button className="hidden h-7 w-7 shrink-0 items-center justify-center rounded text-error hover:bg-error/10 group-hover:inline-flex" onClick={() => void handleDeleteChannel(channel)} title={`Delete #${channel.name}`} type="button"><span className="material-symbols-outlined text-sm">delete</span></button>
+                        ) : null}
+                      </div>
                     ))}
                     {session?.role === 'admin' ? (
                       <button
@@ -1235,22 +1435,22 @@ function CommunityPage() {
                         {isActive && isExpanded ? (
                           <div className="mt-1 ml-2 space-y-0.5">
                             {channels.map((channel) => (
-                              <button
-                                className={`w-full text-left rounded-lg px-3 py-1.5 font-body text-sm flex items-center gap-1.5 ${
-                                  selectedChannel?.id === channel.id && viewMode === 'chat'
-                                    ? 'bg-surface-container-highest text-on-surface font-semibold'
-                                    : 'text-on-surface-variant hover:bg-surface-container-high'
-                                }`}
-                                key={channel.id}
-                                onClick={() => {
-                                  setSelectedChannel(channel)
-                                  setViewMode('chat')
-                                }}
-                                type="button"
-                              >
-                                <span className="text-on-surface-variant">#</span>
-                                {channel.name}
-                              </button>
+                              <div className="group flex items-center" key={channel.id}>
+                                <button
+                                  className={`min-w-0 flex-1 text-left rounded-lg px-3 py-1.5 font-body text-sm flex items-center gap-1.5 ${selectedChannel?.id === channel.id && viewMode === 'chat' ? 'bg-surface-container-highest text-on-surface font-semibold' : 'text-on-surface-variant hover:bg-surface-container-high'}`}
+                                  onClick={() => {
+                                    setSelectedChannel(channel)
+                                    setViewMode('chat')
+                                  }}
+                                  type="button"
+                                >
+                                  <span className="text-on-surface-variant">#</span>
+                                  <span className="truncate">{channel.name}</span>
+                                </button>
+                                {classroom.myRole === 'teacher' || session?.role === 'admin' ? (
+                                  <button className="hidden h-7 w-7 shrink-0 items-center justify-center rounded text-error hover:bg-error/10 group-hover:inline-flex" onClick={() => void handleDeleteChannel(channel)} title={`Delete #${channel.name}`} type="button"><span className="material-symbols-outlined text-sm">delete</span></button>
+                                ) : null}
+                              </div>
                             ))}
                             {classroom.myRole === 'teacher' || session?.role === 'admin' ? (
                               <button
@@ -1344,7 +1544,7 @@ function CommunityPage() {
               ) : null}
 
               {viewMode === 'members' && currentClassroom ? (
-                <MembersTab canManage={canManageSpace} classroomId={currentClassroom.id} />
+                <MembersTab canManage={canManageSpace} classroomId={currentClassroom.id} currentUserId={currentUserId} />
               ) : null}
             </div>
           </div>

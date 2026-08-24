@@ -13,6 +13,10 @@ export const deleteChannel = (id) => apiFetch(`/community/channels/${id}`, { met
 export const fetchMessages = (channelId, before) =>
   apiFetch(`/community/channels/${channelId}/messages${before ? `?before=${encodeURIComponent(before)}` : ''}`)
 export const fetchThread = (messageId) => apiFetch(`/community/messages/${messageId}/thread`)
+export const fetchMessageAttachment = (messageId) =>
+  apiFetch(`/community/messages/${messageId}/attachment`)
+export const searchMentionableUsers = (channelId, q = '') =>
+  apiFetch(`/community/channels/${channelId}/mentionable-users?q=${encodeURIComponent(q)}`)
 export const postMessage = (channelId, payload) =>
   apiFetch(`/community/channels/${channelId}/messages`, { method: 'POST', ...json(payload) })
 export const editMessage = (id, body) =>
@@ -59,6 +63,8 @@ export const fetchAssignments = (classroomId) =>
 export const createAssignment = (payload) =>
   apiFetch('/community/assignments', { method: 'POST', ...json(payload) })
 export const fetchAssignment = (id) => apiFetch(`/community/assignments/${id}`)
+export const fetchAssignmentAttachment = (assignmentId, attachmentId) =>
+  apiFetch(`/community/assignments/${assignmentId}/attachments/${attachmentId}`)
 export const updateAssignment = (id, payload) =>
   apiFetch(`/community/assignments/${id}`, { method: 'PATCH', ...json(payload) })
 export const deleteAssignment = (id) => apiFetch(`/community/assignments/${id}`, { method: 'DELETE' })
@@ -66,6 +72,7 @@ export const submitAssignment = (id, payload) =>
   apiFetch(`/community/assignments/${id}/submissions`, { method: 'POST', ...json(payload) })
 export const gradeSubmission = (id, payload) =>
   apiFetch(`/community/submissions/${id}`, { method: 'PATCH', ...json(payload) })
+export const fetchSubmissionFile = (id) => apiFetch(`/community/submissions/${id}/file`)
 
 /* -------------------------------------------------------------- socket --- */
 export function connectCommunitySocket({ onMessage, onOpen, onClose } = {}) {

@@ -84,6 +84,21 @@ async function ensureChannelAccess(req, res, channel) {
   return ensureClassroomMember(req, res, channel.classroom_id)
 }
 
+async function userCanAccessChannel(user, channel) {
+  if (!channel) return false
+  if (!channel.classroom_id || isRole(user?.role, ROLES.ADMIN)) return true
+  return Boolean(await fetchClassroomMembership(channel.classroom_id, user?.id))
+}
+
+function dataUrlByteSize(dataUrl) {
+  const value = String(dataUrl || '')
+  if (!/^data:[^;,]+;base64,/i.test(value)) return null
+  const encoded = value.slice(value.indexOf(',') + 1)
+  if (encoded.length % 4 !== 0 || !/^[a-zA-Z0-9+/]*={0,2}$/.test(encoded)) return null
+  const padding = encoded.endsWith('==') ? 2 : encoded.endsWith('=') ? 1 : 0
+  return Math.max(0, Math.floor((encoded.length * 3) / 4) - padding)
+}
+
 function mapMessageRow(row) {
   return {
     id: row.id,
@@ -93,6 +108,13 @@ function mapMessageRow(row) {
     deleted: Boolean(row.deleted_at),
     createdAt: row.created_at,
     editedAt: row.edited_at,
+    attachment: row.attachment_name
+      ? {
+          fileName: row.attachment_name,
+          fileType: row.attachment_type || 'application/octet-stream',
+          fileSize: Number(row.attachment_size || 0),
+        }
+      : null,
     author: mapUserSummary({
       id: row.user_id,
       username: row.username,
@@ -104,7 +126,10 @@ function mapMessageRow(row) {
 }
 
 const MESSAGE_SELECT = `
-  SELECT m.*, u.username, u.first_name, u.last_name, u.role AS author_role
+  SELECT m.id, m.channel_id, m.user_id, m.parent_message_id, m.body,
+         m.attachment_name, m.attachment_type, m.attachment_size,
+         m.created_at, m.edited_at, m.deleted_at,
+         u.username, u.first_name, u.last_name, u.role AS author_role
   FROM community_messages m
   JOIN users u ON u.id = m.user_id
 `
@@ -276,13 +301,75 @@ router.get('/messages/:messageId/thread', authenticate, async (req, res) => {
   return res.json({ root: rootMessage, replies })
 })
 
+router.get('/messages/:messageId/attachment', authenticate, async (req, res) => {
+  const [rows] = await pool.query(
+    'SELECT channel_id, deleted_at, attachment_name, attachment_type, attachment_size, attachment_data FROM community_messages WHERE id = ?',
+    [req.params.messageId],
+  )
+  const message = rows[0]
+  if (!message?.attachment_data || message.deleted_at) {
+    return res.status(404).json({ message: 'Attachment not found.' })
+  }
+
+  const channel = await fetchChannelById(message.channel_id)
+  if (!(await ensureChannelAccess(req, res, channel))) return
+
+  return res.json({
+    fileName: message.attachment_name,
+    fileType: message.attachment_type || 'application/octet-stream',
+    fileSize: Number(message.attachment_size || 0),
+    dataUrl: message.attachment_data,
+  })
+})
+
+router.get('/channels/:channelId/mentionable-users', authenticate, async (req, res) => {
+  const channel = await fetchChannelById(req.params.channelId)
+  if (!(await ensureChannelAccess(req, res, channel))) return
+
+  const query = String(req.query.q || '').trim().slice(0, 80)
+  const like = `%${query}%`
+  const params = channel.classroom_id
+    ? [channel.classroom_id, like, like, like, like]
+    : [like, like, like, like]
+  const membershipJoin = channel.classroom_id
+    ? 'JOIN classroom_members cm ON cm.user_id = u.id AND cm.classroom_id = ?'
+    : ''
+  const [rows] = await pool.query(
+    `SELECT DISTINCT u.id, u.username, u.first_name, u.last_name, u.role
+     FROM users u ${membershipJoin}
+     WHERE (u.username LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR CONCAT_WS(' ', u.first_name, u.last_name) LIKE ?)
+     ORDER BY u.first_name, u.last_name, u.username LIMIT 8`,
+    params,
+  )
+  return res.json(rows.map(mapUserSummary))
+})
+
 router.post('/channels/:channelId/messages', authenticate, async (req, res) => {
   const channel = await fetchChannelById(req.params.channelId)
   if (!(await ensureChannelAccess(req, res, channel))) return
 
   const body = String(req.body?.body || '').trim()
-  if (!body) return res.status(400).json({ message: 'Message body is required.' })
+  const attachment = req.body?.attachment && typeof req.body.attachment === 'object'
+    ? req.body.attachment
+    : null
+  if (!body && !attachment?.dataUrl) {
+    return res.status(400).json({ message: 'Write a message or attach a file.' })
+  }
   if (body.length > 8000) return res.status(413).json({ message: 'Message is too long.' })
+
+  let attachmentSize = 0
+  if (attachment && (!attachment.fileName || !attachment.dataUrl)) {
+    return res.status(400).json({ message: 'The attachment is incomplete.' })
+  }
+  if (attachment?.dataUrl && dataUrlByteSize(attachment.dataUrl) === null) {
+    return res.status(400).json({ message: 'The attachment format is invalid.' })
+  }
+  if (attachment?.dataUrl) {
+    attachmentSize = dataUrlByteSize(attachment.dataUrl)
+    if (attachmentSize > 5 * 1024 * 1024) {
+      return res.status(413).json({ message: 'Attachments must be 5 MB or smaller.' })
+    }
+  }
 
   const parentMessageId = req.body?.parentMessageId ? Number(req.body.parentMessageId) : null
   if (parentMessageId) {
@@ -300,11 +387,51 @@ router.post('/channels/:channelId/messages', authenticate, async (req, res) => {
   }
 
   const [result] = await pool.query(
-    'INSERT INTO community_messages (channel_id, user_id, parent_message_id, body) VALUES (?, ?, ?, ?)',
-    [channel.id, req.user.id, parentMessageId, body],
+    `INSERT INTO community_messages
+       (channel_id, user_id, parent_message_id, body, attachment_name, attachment_type, attachment_size, attachment_data)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      channel.id,
+      req.user.id,
+      parentMessageId,
+      body,
+      attachment ? String(attachment.fileName).slice(0, 255) : null,
+      attachment ? String(attachment.fileType || 'application/octet-stream').slice(0, 120) : null,
+      attachment ? attachmentSize : 0,
+      attachment?.dataUrl || null,
+    ],
   )
   const [rows] = await pool.query(`${MESSAGE_SELECT} WHERE m.id = ?`, [result.insertId])
   const [message] = await attachReactionsAndReplyCounts(rows.map(mapMessageRow))
+
+  const mentionedUsernames = [...new Set(
+    [...body.matchAll(/(?:^|\s)@([a-zA-Z0-9._-]+)/g)].map((match) => match[1].toLowerCase()),
+  )].slice(0, 20)
+  if (mentionedUsernames.length) {
+    const placeholders = mentionedUsernames.map(() => '?').join(',')
+    const membershipJoin = channel.classroom_id
+      ? 'JOIN classroom_members cm ON cm.user_id = u.id AND cm.classroom_id = ?'
+      : ''
+    const mentionParams = channel.classroom_id
+      ? [channel.classroom_id, ...mentionedUsernames, req.user.id]
+      : [...mentionedUsernames, req.user.id]
+    const [mentionedUsers] = await pool.query(
+      `SELECT DISTINCT u.id FROM users u ${membershipJoin}
+       WHERE LOWER(u.username) IN (${placeholders}) AND u.id <> ?`,
+      mentionParams,
+    )
+    for (const mentionedUser of mentionedUsers) {
+      await pool.query(
+        'INSERT INTO notifications (title, message, type, is_active, target_user_id) VALUES (?, ?, ?, true, ?)',
+        [
+          `Mentioned in #${channel.name}`,
+          `${message.author?.name || message.author?.username || 'A member'} tagged you in a community message.`,
+          'info',
+          mentionedUser.id,
+        ],
+      )
+    }
+  }
 
   broadcastToChannel(channel.id, { type: 'message.created', channelId: channel.id, message })
   return res.status(201).json(message)
@@ -318,6 +445,8 @@ async function fetchOwnedMessage(id) {
 router.patch('/messages/:id', authenticate, async (req, res) => {
   const existing = await fetchOwnedMessage(req.params.id)
   if (!existing || existing.deleted_at) return res.status(404).json({ message: 'Message not found.' })
+  const channel = await fetchChannelById(existing.channel_id)
+  if (!(await ensureChannelAccess(req, res, channel))) return
   if (existing.user_id !== req.user.id && req.user.role !== 'admin') {
     return res.status(403).json({ message: 'You can only edit your own messages.' })
   }
@@ -339,6 +468,8 @@ router.patch('/messages/:id', authenticate, async (req, res) => {
 router.delete('/messages/:id', authenticate, async (req, res) => {
   const existing = await fetchOwnedMessage(req.params.id)
   if (!existing || existing.deleted_at) return res.status(404).json({ message: 'Message not found.' })
+  const channel = await fetchChannelById(existing.channel_id)
+  if (!(await ensureChannelAccess(req, res, channel))) return
   if (existing.user_id !== req.user.id && !(await userIsAdminOrTrainer(req.user))) {
     return res.status(403).json({ message: 'You cannot delete this message.' })
   }
@@ -360,6 +491,8 @@ router.delete('/messages/:id', authenticate, async (req, res) => {
 router.post('/messages/:id/reactions', authenticate, async (req, res) => {
   const existing = await fetchOwnedMessage(req.params.id)
   if (!existing || existing.deleted_at) return res.status(404).json({ message: 'Message not found.' })
+  const channel = await fetchChannelById(existing.channel_id)
+  if (!(await ensureChannelAccess(req, res, channel))) return
 
   const emoji = String(req.body?.emoji || '').trim().slice(0, 16)
   if (!emoji) return res.status(400).json({ message: 'Emoji is required.' })
@@ -526,6 +659,11 @@ router.post('/classrooms/:id/members', authenticate, requireTrainer, async (req,
   const userId = Number(req.body?.userId)
   const role = req.body?.role === 'teacher' ? 'teacher' : 'student'
   if (!userId) return res.status(400).json({ message: 'userId is required.' })
+  const [targetRows] = await pool.query('SELECT id, role FROM users WHERE id = ? AND is_active = true', [userId])
+  if (!targetRows.length) return res.status(404).json({ message: 'Active user not found.' })
+  if (role === 'teacher' && !isRole(targetRows[0].role, ROLES.TRAINER, ROLES.ADMIN)) {
+    return res.status(400).json({ message: 'Only a trainer or admin account can be assigned as a teacher.' })
+  }
 
   await pool.query(
     'INSERT INTO classroom_members (classroom_id, user_id, classroom_role) VALUES (?, ?, ?) ' +
@@ -548,6 +686,12 @@ router.post('/classrooms/:id/members', authenticate, requireTrainer, async (req,
 router.delete('/classrooms/:id/members/:userId', authenticate, requireTrainer, async (req, res) => {
   const classroomId = Number(req.params.id)
   if (!(await ensureClassroomTeacher(req, res, classroomId))) return
+
+  const membership = await fetchClassroomMembership(classroomId, req.params.userId)
+  if (!membership) return res.status(404).json({ message: 'Classroom member not found.' })
+  if (membership.classroom_role === 'teacher') {
+    return res.status(400).json({ message: 'Reassign this teacher as a student before removing them.' })
+  }
 
   await pool.query('DELETE FROM classroom_members WHERE classroom_id = ? AND user_id = ?', [
     classroomId,
@@ -765,6 +909,15 @@ router.patch('/discussions/:id', authenticate, async (req, res) => {
     params.push(req.body.status)
   }
   if (req.body?.acceptedCommentId !== undefined) {
+    if (req.body.acceptedCommentId) {
+      const [acceptedRows] = await pool.query(
+        'SELECT id FROM discussion_comments WHERE id = ? AND issue_id = ?',
+        [req.body.acceptedCommentId, issueRow.id],
+      )
+      if (!acceptedRows.length) {
+        return res.status(400).json({ message: 'That answer does not belong to this discussion.' })
+      }
+    }
     fields.push('accepted_comment_id = ?')
     params.push(req.body.acceptedCommentId || null)
     if (req.body.acceptedCommentId) {
@@ -805,7 +958,7 @@ router.post('/discussions/:id/comments', authenticate, async (req, res) => {
     [issueRow.id, req.user.id, parentCommentId, body],
   )
 
-  if (issueRow.status === 'open' && req.user.id !== issueRow.author_id) {
+  if (issueRow.status === 'open') {
     await pool.query('UPDATE discussion_issues SET status = "answered" WHERE id = ? AND status = "open"', [
       issueRow.id,
     ])
@@ -836,6 +989,9 @@ router.post('/discussions/:id/comments', authenticate, async (req, res) => {
 })
 
 /* ---------------------------------------------------------- assignments --- */
+
+const MAX_ASSIGNMENT_FILE_BYTES = 8 * 1024 * 1024
+const ASSIGNMENT_SUBMISSION_TYPES = new Set(['text', 'file', 'link', 'github'])
 
 function mapAssignmentRow(row) {
   return {
@@ -933,6 +1089,28 @@ router.post('/assignments', authenticate, requireTrainer, async (req, res) => {
   const title = String(req.body?.title || '').trim()
   if (!title) return res.status(400).json({ message: 'Title is required.' })
 
+  const submissionType = String(req.body?.submissionType || 'text')
+  if (!ASSIGNMENT_SUBMISSION_TYPES.has(submissionType)) {
+    return res.status(400).json({ message: 'Invalid submission type.' })
+  }
+  const attachments = Array.isArray(req.body?.attachments) ? req.body.attachments.slice(0, 10) : []
+  const normalizedAttachments = []
+  for (const attachment of attachments) {
+    const fileData = attachment.fileData || null
+    const externalUrl = String(attachment.externalUrl || '').slice(0, 2000) || null
+    if (!fileData && !externalUrl) {
+      return res.status(400).json({ message: 'Each assignment attachment must include a file or URL.' })
+    }
+    const fileSize = fileData ? dataUrlByteSize(fileData) : 0
+    if (fileData && fileSize === null) {
+      return res.status(400).json({ message: 'An assignment attachment has an invalid format.' })
+    }
+    if (fileSize > MAX_ASSIGNMENT_FILE_BYTES) {
+      return res.status(413).json({ message: 'Assignment attachments must be 8 MB or smaller.' })
+    }
+    normalizedAttachments.push({ ...attachment, fileData, externalUrl, fileSize })
+  }
+
   const [result] = await pool.query(
     `INSERT INTO classroom_assignments
        (classroom_id, title, description, instructions, due_at, max_marks, submission_type, created_by)
@@ -944,13 +1122,12 @@ router.post('/assignments', authenticate, requireTrainer, async (req, res) => {
       String(req.body?.instructions || '').trim(),
       req.body?.dueAt ? new Date(req.body.dueAt) : null,
       Number(req.body?.maxMarks) || 100,
-      String(req.body?.submissionType || 'text'),
+      submissionType,
       req.user.id,
     ],
   )
 
-  const attachments = Array.isArray(req.body?.attachments) ? req.body.attachments : []
-  for (const attachment of attachments.slice(0, 10)) {
+  for (const attachment of normalizedAttachments) {
     await pool.query(
       `INSERT INTO classroom_assignment_attachments (assignment_id, file_name, file_type, file_size, file_data, external_url)
        VALUES (?, ?, ?, ?, ?, ?)`,
@@ -958,9 +1135,9 @@ router.post('/assignments', authenticate, requireTrainer, async (req, res) => {
         result.insertId,
         String(attachment.fileName || '').slice(0, 255),
         String(attachment.fileType || '').slice(0, 120),
-        Number(attachment.fileSize) || 0,
-        attachment.fileData || null,
-        String(attachment.externalUrl || '').slice(0, 2000) || null,
+        attachment.fileSize,
+        attachment.fileData,
+        attachment.externalUrl,
       ],
     )
   }
@@ -1005,10 +1182,33 @@ router.get('/assignments/:id', authenticate, async (req, res) => {
   return res.json({ ...assignment, mySubmission: ownRows[0] ? mapSubmissionRow(ownRows[0]) : null })
 })
 
+router.get('/assignments/:id/attachments/:attachmentId', authenticate, async (req, res) => {
+  const assignmentRow = await fetchAssignmentForRequest(req, res, req.params.id)
+  if (!assignmentRow) return
+
+  const [rows] = await pool.query(
+    `SELECT file_name, file_type, file_size, file_data, external_url
+     FROM assignment_attachments WHERE id = ? AND assignment_id = ?`,
+    [req.params.attachmentId, assignmentRow.id],
+  )
+  const attachment = rows[0]
+  if (!attachment) return res.status(404).json({ message: 'Attachment not found.' })
+  return res.json({
+    fileName: attachment.file_name,
+    fileType: attachment.file_type || 'application/octet-stream',
+    fileSize: Number(attachment.file_size || 0),
+    dataUrl: attachment.file_data,
+    externalUrl: attachment.external_url,
+  })
+})
+
 router.patch('/assignments/:id', authenticate, requireTrainer, async (req, res) => {
   const assignmentRow = await fetchAssignmentForRequest(req, res, req.params.id)
   if (!assignmentRow) return
   if (!(await ensureClassroomTeacher(req, res, assignmentRow.classroom_id))) return
+  if (req.body?.submissionType !== undefined && !ASSIGNMENT_SUBMISSION_TYPES.has(req.body.submissionType)) {
+    return res.status(400).json({ message: 'Invalid submission type.' })
+  }
 
   const fields = []
   const params = []
@@ -1084,8 +1284,34 @@ router.post('/assignments/:id/submissions', authenticate, async (req, res) => {
   const body = String(req.body?.body || '').trim()
   const linkUrl = String(req.body?.linkUrl || '').trim()
   const fileData = req.body?.fileData || null
-  if (!body && !linkUrl && !fileData) {
-    return res.status(400).json({ message: 'Provide a text answer, link, or file.' })
+  const submissionType = assignmentRow.submission_type
+  if (submissionType === 'text' && !body) {
+    return res.status(400).json({ message: 'A text answer is required.' })
+  }
+  if (submissionType === 'file' && !fileData) {
+    return res.status(400).json({ message: 'A file is required.' })
+  }
+  if (['link', 'github'].includes(submissionType)) {
+    let parsedUrl
+    try {
+      parsedUrl = new URL(linkUrl)
+    } catch {
+      return res.status(400).json({ message: 'A valid link is required.' })
+    }
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      return res.status(400).json({ message: 'The submission link must use HTTP or HTTPS.' })
+    }
+    if (submissionType === 'github' && !/(^|\.)github\.com$/i.test(parsedUrl.hostname)) {
+      return res.status(400).json({ message: 'A GitHub repository URL is required.' })
+    }
+  }
+
+  const actualFileSize = fileData ? dataUrlByteSize(fileData) : 0
+  if (fileData && actualFileSize === null) {
+    return res.status(400).json({ message: 'The uploaded file format is invalid.' })
+  }
+  if (actualFileSize > MAX_ASSIGNMENT_FILE_BYTES) {
+    return res.status(413).json({ message: 'Submission files must be 8 MB or smaller.' })
   }
 
   const status = assignmentRow.due_at && new Date() > new Date(assignmentRow.due_at) ? 'late' : 'submitted'
@@ -1106,7 +1332,7 @@ router.post('/assignments/:id/submissions', authenticate, async (req, res) => {
       linkUrl,
       String(req.body?.fileName || '').slice(0, 255),
       String(req.body?.fileType || '').slice(0, 120),
-      Number(req.body?.fileSize) || 0,
+      actualFileSize,
       fileData,
       status,
     ],
@@ -1117,6 +1343,28 @@ router.post('/assignments/:id/submissions', authenticate, async (req, res) => {
     [assignmentRow.id, req.user.id],
   )
   return res.status(201).json(mapSubmissionRow(rows[0]))
+})
+
+router.get('/submissions/:id/file', authenticate, async (req, res) => {
+  const [rows] = await pool.query('SELECT * FROM assignment_submissions WHERE id = ?', [req.params.id])
+  const submission = rows[0]
+  if (!submission?.file_data) return res.status(404).json({ message: 'Submission file not found.' })
+
+  const [assignmentRows] = await pool.query('SELECT * FROM assignments WHERE id = ?', [submission.assignment_id])
+  const assignment = assignmentRows[0]
+  if (!assignment || !(await ensureClassroomMember(req, res, assignment.classroom_id))) return
+  const membership = await fetchClassroomMembership(assignment.classroom_id, req.user.id)
+  const canReview = isRole(req.user.role, ROLES.ADMIN) || membership?.classroom_role === 'teacher'
+  if (!canReview && submission.student_id !== req.user.id) {
+    return res.status(403).json({ message: 'You cannot download this submission.' })
+  }
+
+  return res.json({
+    fileName: submission.file_name,
+    fileType: submission.file_type || 'application/octet-stream',
+    fileSize: Number(submission.file_size || 0),
+    dataUrl: submission.file_data,
+  })
 })
 
 router.patch('/submissions/:id', authenticate, requireTrainer, async (req, res) => {
@@ -1147,7 +1395,11 @@ router.patch('/submissions/:id', authenticate, requireTrainer, async (req, res) 
   params.push(submission.id)
   await pool.query(`UPDATE classroom_assignment_submissions SET ${fields.join(', ')} WHERE id = ?`, params)
 
-  const [updatedRows] = await pool.query('SELECT * FROM classroom_assignment_submissions WHERE id = ?', [submission.id])
+  const [updatedRows] = await pool.query(
+    `SELECT s.*, u.username, u.first_name, u.last_name
+     FROM classroom_assignment_submissions s JOIN users u ON u.id = s.student_id WHERE s.id = ?`,
+    [submission.id],
+  )
   return res.json(mapSubmissionRow(updatedRows[0]))
 })
 
@@ -1194,8 +1446,9 @@ export function setupCommunityWebSocket(server) {
     }
 
     const subscribedChannels = new Set()
+    const requestedChannels = new Set()
 
-    ws.on('message', (raw) => {
+    ws.on('message', async (raw) => {
       let payload
       try {
         payload = JSON.parse(raw.toString())
@@ -1205,6 +1458,12 @@ export function setupCommunityWebSocket(server) {
 
       if (payload?.type === 'join' && payload.channelId) {
         const channelId = Number(payload.channelId)
+        requestedChannels.add(channelId)
+        const channel = await fetchChannelById(channelId).catch(() => null)
+        const hasAccess = await userCanAccessChannel(user, channel).catch(() => false)
+        if (!hasAccess || !requestedChannels.has(channelId)) {
+          return
+        }
         if (!channelSockets.has(channelId)) {
           channelSockets.set(channelId, new Set())
         }
@@ -1214,6 +1473,7 @@ export function setupCommunityWebSocket(server) {
 
       if (payload?.type === 'leave' && payload.channelId) {
         const channelId = Number(payload.channelId)
+        requestedChannels.delete(channelId)
         channelSockets.get(channelId)?.delete(ws)
         subscribedChannels.delete(channelId)
       }

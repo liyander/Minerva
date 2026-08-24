@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   createAssignment,
   fetchAssignment,
+  fetchAssignmentAttachment,
   fetchAssignments,
+  fetchSubmissionFile,
   gradeSubmission,
   submitAssignment,
 } from '../../services/community'
@@ -34,6 +36,49 @@ const STATUS_STYLES = {
   reviewed: 'bg-mint text-on-mint',
   resubmit: 'bg-butter text-on-butter',
   completed: 'bg-primary-container text-on-primary-container',
+}
+
+function ProtectedFileButton({ label, loadFile }) {
+  const [isDownloading, setIsDownloading] = useState(false)
+  const [error, setError] = useState('')
+
+  const download = async () => {
+    setIsDownloading(true)
+    setError('')
+    try {
+      const file = await loadFile()
+      if (file.externalUrl && !file.dataUrl) {
+        window.open(file.externalUrl, '_blank', 'noopener,noreferrer')
+        return
+      }
+      if (!file.dataUrl) throw new Error('This file is unavailable.')
+      const link = document.createElement('a')
+      link.href = file.dataUrl
+      link.download = file.fileName || label || 'attachment'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+    } catch (downloadError) {
+      setError(downloadError?.message || 'Download failed.')
+    } finally {
+      setIsDownloading(false)
+    }
+  }
+
+  return (
+    <span className="inline-flex flex-col items-start">
+      <button
+        className="inline-flex items-center gap-1.5 rounded-full bg-surface-container-high px-3 py-1 font-body text-xs text-on-surface hover:bg-surface-container-highest disabled:opacity-50"
+        disabled={isDownloading}
+        onClick={() => void download()}
+        type="button"
+      >
+        <span className="material-symbols-outlined text-sm">{isDownloading ? 'progress_activity' : 'download'}</span>
+        {label}
+      </button>
+      {error ? <span className="mt-1 font-body text-[10px] text-error">{error}</span> : null}
+    </span>
+  )
 }
 
 function NewAssignmentForm({ classroomId, onClose, onCreated }) {
@@ -299,7 +344,9 @@ function GradeRow({ submission, maxMarks, onGraded }) {
         </a>
       ) : null}
       {submission.fileName ? (
-        <p className="font-body text-xs text-on-surface-variant mt-1">Attached: {submission.fileName}</p>
+        <div className="mt-2">
+          <ProtectedFileButton label={submission.fileName} loadFile={() => fetchSubmissionFile(submission.id)} />
+        </div>
       ) : null}
 
       <div className="flex items-center gap-2 mt-3">
@@ -333,6 +380,14 @@ function GradeRow({ submission, maxMarks, onGraded }) {
           type="button"
         >
           Request resubmit
+        </button>
+        <button
+          className="rounded-full px-3 py-1.5 font-headline text-[11px] font-bold text-primary hover:bg-primary-container disabled:opacity-50"
+          disabled={isSaving}
+          onClick={() => save('completed')}
+          type="button"
+        >
+          Complete
         </button>
       </div>
     </div>
@@ -401,9 +456,11 @@ function AssignmentsTab({ classroomId, canManage }) {
           {detail.attachments?.length ? (
             <div className="flex flex-wrap gap-2">
               {detail.attachments.map((attachment) => (
-                <span className="rounded-full bg-surface-container-high px-3 py-1 font-body text-xs text-on-surface" key={attachment.id}>
-                  📎 {attachment.fileName}
-                </span>
+                <ProtectedFileButton
+                  key={attachment.id}
+                  label={attachment.fileName}
+                  loadFile={() => fetchAssignmentAttachment(detail.id, attachment.id)}
+                />
               ))}
             </div>
           ) : null}
@@ -450,6 +507,11 @@ function AssignmentsTab({ classroomId, canManage }) {
                   ) : null}
                   {detail.mySubmission.feedback ? (
                     <p className="font-body text-sm text-on-surface-variant mt-1">Feedback: {detail.mySubmission.feedback}</p>
+                  ) : null}
+                  {detail.mySubmission.fileName ? (
+                    <div className="mt-2">
+                      <ProtectedFileButton label={detail.mySubmission.fileName} loadFile={() => fetchSubmissionFile(detail.mySubmission.id)} />
+                    </div>
                   ) : null}
                   {detail.mySubmission.status === 'resubmit' ? (
                     <div className="mt-3">

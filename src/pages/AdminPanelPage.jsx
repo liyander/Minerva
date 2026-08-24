@@ -95,6 +95,23 @@ function AdminPanelPage({ config, onConfigChange, onLogout, username }) {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="rounded-2xl bg-surface-container-lowest shadow-soft p-6 hover:bg-surface-container-high transition-all cursor-pointer">
+              <a className="block" href="/community">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-primary" style={{ fontSize: '32px' }}>forum</span>
+                    <div>
+                      <h3 className="font-headline text-lg font-bold">Community</h3>
+                      <p className="text-xs text-on-surface-variant">Channels, classrooms and discussions</p>
+                    </div>
+                  </div>
+                  <span className="material-symbols-outlined text-on-surface-variant">chevron_right</span>
+                </div>
+                <p className="text-sm text-on-surface-variant">
+                  Open the general community, manage classroom membership, and moderate conversations.
+                </p>
+              </a>
+            </div>
+            <div className="rounded-2xl bg-surface-container-lowest shadow-soft p-6 hover:bg-surface-container-high transition-all cursor-pointer">
               <a className="block" href="/admin/users">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">

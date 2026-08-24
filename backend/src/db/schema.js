@@ -484,6 +484,10 @@ const COLUMN_MIGRATIONS = [
   ['rooms', 'room_type', "VARCHAR(30) NOT NULL DEFAULT 'theoretical'"],
   ['user_room_question_progress', 'answer_text', 'LONGTEXT NULL'],
   ['admin_ai_chat_history', 'session_id', 'BIGINT NULL'],
+  ['community_messages', 'attachment_name', 'VARCHAR(255) NULL'],
+  ['community_messages', 'attachment_type', 'VARCHAR(120) NULL'],
+  ['community_messages', 'attachment_size', 'INT DEFAULT 0'],
+  ['community_messages', 'attachment_data', 'LONGTEXT NULL'],
 ]
 
 async function addColumnIfMissing(conn, tableName, columnName, definitionSql) {
