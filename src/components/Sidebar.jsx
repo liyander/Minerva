@@ -76,6 +76,7 @@ function Sidebar({ config, isSidebarOpen, onClose }) {
             config.routes.practiceLabs && { to: '/learn', icon: 'school', label: 'Courses' },
             { to: '/resources', icon: 'menu_book', label: 'Resources' },
             { to: '/notes', icon: 'edit_note', label: 'Notes' },
+            { to: '/community', icon: 'forum', label: 'Community' },
             { to: '/my-profile', icon: 'badge', label: 'My Profile' },
           ]
         : [
@@ -91,6 +92,7 @@ function Sidebar({ config, isSidebarOpen, onClose }) {
             config.routes.upcomingCtf && { to: '/events', icon: 'event_upcoming', label: 'Events' },
             { to: '/resources', icon: 'menu_book', label: 'Resources' },
             { to: '/notes', icon: 'edit_note', label: 'Notes' },
+            { to: '/community', icon: 'forum', label: 'Community' },
             { to: '/projects', icon: 'science', label: 'Projects' },
             { to: '/roadmap', icon: 'route', label: 'Roadmap' },
             { to: '/leaderboard', icon: 'leaderboard', label: 'Leaderboard' },
