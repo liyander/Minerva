@@ -702,6 +702,61 @@ function AdminStudentStatsPage() {
                   </div>
                 )}
 
+                {/* Key Student Statistics & Performance Metrics */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="rounded-2xl bg-surface-container-lowest p-5 shadow-soft border border-outline-variant/10">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs uppercase font-bold tracking-wider text-on-surface-variant">Quiz Pass Rate</span>
+                      <span className="material-symbols-outlined text-primary text-base">quiz</span>
+                    </div>
+                    <p className="text-2xl font-headline font-extrabold mt-2 text-on-background">
+                      {progressionData?.statistics?.assessmentPassRate || 0}%
+                    </p>
+                    <p className="text-[11px] text-on-surface-variant mt-1">
+                      {progressionData?.statistics?.passedAssessments || 0}/{progressionData?.statistics?.totalAssessmentAttempts || 0} passed (avg: {progressionData?.statistics?.assessmentAverage || 0}%)
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl bg-surface-container-lowest p-5 shadow-soft border border-outline-variant/10">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs uppercase font-bold tracking-wider text-on-surface-variant">Completed Labs</span>
+                      <span className="material-symbols-outlined text-secondary text-base">science</span>
+                    </div>
+                    <p className="text-2xl font-headline font-extrabold mt-2 text-on-background">
+                      {progressionData?.statistics?.totalCompletedRooms || completedRooms?.totalCompleted || 0}
+                    </p>
+                    <p className="text-[11px] text-on-surface-variant mt-1">
+                      {progressionData?.gamification?.roomXp || completedRooms?.totalXp || 0} Course XP earned
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl bg-surface-container-lowest p-5 shadow-soft border border-outline-variant/10">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs uppercase font-bold tracking-wider text-on-surface-variant">Assignments</span>
+                      <span className="material-symbols-outlined text-butter text-base">assignment</span>
+                    </div>
+                    <p className="text-2xl font-headline font-extrabold mt-2 text-on-background">
+                      {progressionData?.statistics?.passedAssignments || 0}/{progressionData?.statistics?.assignmentSubmissions || 0}
+                    </p>
+                    <p className="text-[11px] text-on-surface-variant mt-1">
+                      Avg Score: {progressionData?.statistics?.avgAssignmentScore || 0} pts
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl bg-surface-container-lowest p-5 shadow-soft border border-outline-variant/10">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs uppercase font-bold tracking-wider text-on-surface-variant">Attendance</span>
+                      <span className="material-symbols-outlined text-mint text-base">event_available</span>
+                    </div>
+                    <p className="text-2xl font-headline font-extrabold mt-2 text-on-background">
+                      {progressionData?.statistics?.attendanceRate || 100}%
+                    </p>
+                    <p className="text-[11px] text-on-surface-variant mt-1">
+                      {progressionData?.statistics?.attendedSessions || 0}/{progressionData?.statistics?.totalSessions || 0} sessions present
+                    </p>
+                  </div>
+                </div>
+
                 {/* Gamification & Mastery Overview */}
                 <div className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft">
                   <h3 className="font-headline text-lg font-bold text-on-background flex items-center gap-2 mb-6">

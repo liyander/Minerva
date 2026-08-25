@@ -260,7 +260,87 @@ router.get('/admin/student-progression/:userId', requireTrainer, async (req, res
   // 4. Recommendations
   const recommendations = await generatePersonalizedRecommendations(targetUserId)
 
-  // 5. Active path progress & gating breakdown
+  // 5. Comprehensive Student Performance Statistics
+  const [roomStats] = await pool.query(
+    `SELECT COUNT(*) AS total_completed, COALESCE(SUM(r.points), 0) AS room_points
+     FROM user_room_progress p
+     JOIN rooms r ON r.id = p.room_id
+     WHERE p.user_id = ? AND p.completed_at IS NOT NULL`,
+    [targetUserId],
+  )
+
+  const [assessmentStats] = await pool.query(
+    `SELECT 
+       COUNT(*) AS total_attempts,
+       SUM(passed = true) AS total_passed,
+       COALESCE(ROUND(AVG(percentage)), 0) AS avg_percentage,
+       COALESCE(MAX(percentage), 0) AS max_percentage
+     FROM assessment_attempts
+     WHERE user_id = ? AND submitted_at IS NOT NULL`,
+    [targetUserId],
+  )
+
+  const [assignmentStats] = await pool.query(
+    `SELECT 
+       COUNT(*) AS total_submissions,
+       SUM(passed = true) AS passed_submissions,
+       COALESCE(ROUND(AVG(score)), 0) AS avg_assignment_score
+     FROM assignment_submissions
+     WHERE user_id = ?`,
+    [targetUserId],
+  )
+
+  const [attendanceStats] = await pool.query(
+    `SELECT 
+       COUNT(*) AS total_sessions,
+       SUM(status = 'present') AS attended_sessions
+     FROM attendance_records
+     WHERE user_id = ?`,
+    [targetUserId],
+  )
+
+  const [categoryBreakdown] = await pool.query(
+    `SELECT 
+       r.category,
+       COUNT(p.id) AS completed_count,
+       COALESCE(ROUND(AVG(r.points)), 0) AS avg_xp
+     FROM user_room_progress p
+     JOIN rooms r ON r.id = p.room_id
+     WHERE p.user_id = ? AND p.completed_at IS NOT NULL
+     GROUP BY r.category`,
+    [targetUserId],
+  )
+
+  const totalSessions = Number(attendanceStats[0]?.total_sessions || 0)
+  const attendedSessions = Number(attendanceStats[0]?.attended_sessions || 0)
+  const attendanceRate = totalSessions > 0 ? Math.round((attendedSessions / totalSessions) * 100) : 100
+
+  const totalAttempts = Number(assessmentStats[0]?.total_attempts || 0)
+  const totalPassed = Number(assessmentStats[0]?.total_passed || 0)
+  const assessmentPassRate = totalAttempts > 0 ? Math.round((totalPassed / totalAttempts) * 100) : 0
+
+  const statistics = {
+    totalCompletedRooms: Number(roomStats[0]?.total_completed || 0),
+    roomPoints: Number(roomStats[0]?.room_points || 0),
+    totalAssessmentAttempts: totalAttempts,
+    passedAssessments: totalPassed,
+    assessmentAverage: Number(assessmentStats[0]?.avg_percentage || 0),
+    highestAssessmentScore: Number(assessmentStats[0]?.max_percentage || 0),
+    assessmentPassRate,
+    assignmentSubmissions: Number(assignmentStats[0]?.total_submissions || 0),
+    passedAssignments: Number(assignmentStats[0]?.passed_submissions || 0),
+    avgAssignmentScore: Number(assignmentStats[0]?.avg_assignment_score || 0),
+    totalSessions,
+    attendedSessions,
+    attendanceRate,
+    categoryBreakdown: categoryBreakdown.map(c => ({
+      category: c.category,
+      completed: Number(c.completed_count),
+      avgXp: Number(c.avg_xp)
+    }))
+  }
+
+  // 6. Active path progress & gating breakdown
   const [enrolledPaths] = await pool.query(
     `SELECT e.career_path_id, cp.title AS path_title
      FROM course_enrollments e
@@ -326,6 +406,7 @@ router.get('/admin/student-progression/:userId', requireTrainer, async (req, res
     user: users[0],
     gamification,
     risk,
+    statistics,
     recommendations,
     pathProgress,
   })
