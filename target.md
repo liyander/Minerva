@@ -25,15 +25,14 @@ This file is the implementation tracker for the next platform features.
 
 ## Streams and learning models
 
-
-- [ ] **Flexible practical activities**
+- [x] ~~**Flexible practical activities**~~
   - Replace domain-specific lab assumptions with a reusable activity model.
   - Support coding exercises, essays, file submissions, design portfolios, case studies, simulations, research work, viva sessions, and presentations.
   - Allow each activity type to define its instructions, evidence requirements, completion rules, grading method, and environment.
   - Support individual and group activities.
   - Preserve compatibility with existing practical environments and course progress.
 
-- [ ] **Personalized learning recommendations**
+- [x] ~~**Personalized learning recommendations**~~
   - Recommend lessons, activities, assessments, and projects using performance, goals, stream, prerequisites, and skill gaps.
   - Explain the evidence and reasoning behind each recommendation.
   - Let trainees dismiss, save, or complete recommendations.
@@ -42,7 +41,7 @@ This file is the implementation tracker for the next platform features.
 
 ## Files and media
 
-- [ ] **Object storage for uploads and recorded lectures**
+- [x] ~~**Object storage for uploads and recorded lectures**~~
   - Support S3-compatible storage, including MinIO.
   - Store file metadata in MySQL instead of storing large base64 payloads.
   - Use signed upload and download URLs with authorization and expiry controls.
@@ -143,19 +142,19 @@ This file is the implementation tracker for the next platform features.
 
 ## Analytics
 
-- [ ] **CSV and PDF report exports**
+- [x] ~~**CSV and PDF report exports**~~
   - Export dashboard, progress, assessment, assignment, cohort, and compliance data.
   - Apply the same filters and permissions as the on-screen report.
   - Include generation timestamps and clear report metadata.
   - Handle large exports without blocking normal API requests.
 
-- [ ] **Trainee skill-gap analysis**
+- [x] ~~**Trainee skill-gap analysis**~~
   - Compare verified and declared trainee skills with a selected target role or learning goal.
   - Derive evidence from courses, assessments, assignments, projects, and trainer evaluations.
   - Identify missing or weak skills and recommend relevant learning content.
   - Explain why each recommendation was produced.
 
-- [ ] **Trainer performance dashboard**
+- [x] ~~**Trainer performance dashboard**~~
   - Show assigned learners, engagement, completion, assessment, and grading metrics.
   - Track grading turnaround time and outstanding work.
   - Summarize course feedback without exposing inappropriate personal data.
@@ -163,7 +162,7 @@ This file is the implementation tracker for the next platform features.
 
 ## Platform hardening
 
-- [ ] **Administrator audit log**
+- [x] ~~**Administrator audit log**~~
   - Record approvals, rejections, role changes, activation changes, deletions, enrolments, grading changes, and configuration updates.
   - Capture actor, action, entity, timestamp, source IP, and safe metadata.
   - Provide filtering, pagination, and export.

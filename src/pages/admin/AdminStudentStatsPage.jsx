@@ -218,76 +218,177 @@ function TimelineChart({ rooms }) {
   )
 }
 
-function SkillGapAnalysis({ roomActivity, defaultCourses }) {
+function SkillGapAndProgressionAnalysis({ roomActivity, defaultCourses, progressionData, onFastTrack, actionBusy }) {
   const categoryScores = {};
   const categoryCounts = {};
   
-  if (!roomActivity?.rooms) return null;
-  
-  roomActivity.rooms.forEach(room => {
-    if (room.status === 'completed' && room.technicalScore !== null) {
-       categoryScores[room.category] = (categoryScores[room.category] || 0) + room.technicalScore;
-       categoryCounts[room.category] = (categoryCounts[room.category] || 0) + 1;
-    }
-  });
+  if (roomActivity?.rooms) {
+    roomActivity.rooms.forEach(room => {
+      if (room.status === 'completed' && room.technicalScore !== null) {
+        categoryScores[room.category] = (categoryScores[room.category] || 0) + room.technicalScore;
+        categoryCounts[room.category] = (categoryCounts[room.category] || 0) + 1;
+      }
+    });
+  }
   
   const weakCategories = Object.keys(categoryScores)
     .map(cat => ({ category: cat, avgScore: categoryScores[cat] / categoryCounts[cat] }))
     .filter(cat => cat.avgScore < 75)
     .sort((a, b) => a.avgScore - b.avgScore);
-    
-  if (weakCategories.length === 0) {
-    return (
-      <div className="rounded-3xl bg-mint/10 p-6 border border-mint/20 mt-6">
-        <h3 className="font-headline text-lg font-bold text-mint flex items-center gap-2">
-          <span className="material-symbols-outlined">verified</span>
-          No Major Weaknesses Detected
-        </h3>
-        <p className="text-sm text-on-surface mt-2">The student is performing well (≥ 75%) across all attempted categories.</p>
-      </div>
-    )
+
+  // Find modules currently blocked by dynamic rules or prerequisites
+  const blockedModules = [];
+  if (progressionData?.pathProgress) {
+    progressionData.pathProgress.forEach(path => {
+      path.modules.forEach(mod => {
+        if (!mod.isUnlocked && !mod.isComplete) {
+          blockedModules.push({ ...mod, pathTitle: path.pathTitle });
+        }
+      });
+    });
   }
 
+  const dynamicRecs = progressionData?.recommendations || [];
+
   return (
-    <div className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft mt-6">
-      <h3 className="font-headline text-lg font-bold text-on-background flex items-center gap-2 mb-4">
-        <span className="material-symbols-outlined text-blush">warning</span>
-        Skill Gap Analysis & Recommendations
-      </h3>
-      <p className="text-sm text-on-surface-variant mb-6">We identified areas where the student's average technical score is below 75%. Here are some recommended courses to help them upskill.</p>
-      
-      <div className="space-y-6">
-        {weakCategories.map(weak => {
-           const recommendations = defaultCourses.filter(c => c.category === weak.category || c.tags?.includes(weak.category)).slice(0, 2);
-           
-           return (
-             <div key={weak.category} className="bg-surface p-5 rounded-2xl border border-blush/20">
-               <div className="flex justify-between items-center mb-4">
-                 <h4 className="font-headline text-base font-bold text-on-background">{weak.category}</h4>
-                 <span className="bg-blush/20 text-blush px-3 py-1 rounded-full text-xs font-bold">Avg Score: {Math.round(weak.avgScore)}%</span>
-               </div>
-               
-               {recommendations.length > 0 ? (
-                 <div>
-                   <p className="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-3">Recommended Courses</p>
-                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                     {recommendations.map(rec => (
-                       <a key={rec.id} href={`/courses/${rec.slug}`} className="flex flex-col gap-1 p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/20 hover:border-primary transition-colors">
-                         <span className="font-bold text-sm text-on-background truncate">{rec.title}</span>
-                         <span className="text-xs text-on-surface-variant truncate">{rec.description}</span>
-                       </a>
-                     ))}
-                   </div>
-                 </div>
-               ) : (
-                 <p className="text-sm text-on-surface-variant italic">No specific courses found for this category.</p>
-               )}
-             </div>
-           )
-        })}
+    <div className="space-y-6 mt-6">
+      {/* 1. Dynamic Adaptive Progression & Bottlenecks Analysis */}
+      <div className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft">
+        <h3 className="font-headline text-lg font-bold text-on-background flex items-center gap-2 mb-2">
+          <span className="material-symbols-outlined text-primary">account_tree</span>
+          Dynamic Progression & Gating Analysis
+        </h3>
+        <p className="text-sm text-on-surface-variant mb-6">
+          Real-time tracking of module unlock conditions, diagnostic pre-tests, and prerequisite gating across career paths.
+        </p>
+
+        {blockedModules.length > 0 ? (
+          <div className="space-y-3">
+            <h4 className="font-headline text-xs font-bold uppercase tracking-wider text-blush flex items-center gap-1">
+              <span className="material-symbols-outlined text-sm">lock</span>
+              {blockedModules.length} Module Gating Bottleneck(s) Detected
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {blockedModules.map(mod => (
+                <div key={mod.id} className="p-4 rounded-2xl bg-surface border border-blush/30 flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-start">
+                      <span className="text-[10px] uppercase font-bold text-on-surface-variant">{mod.pathTitle}</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blush/20 text-blush">Locked</span>
+                    </div>
+                    <h5 className="font-headline text-sm font-bold text-on-background mt-1">{mod.title}</h5>
+                    
+                    {mod.blockedReasons?.length > 0 && (
+                      <div className="mt-2 text-xs text-blush space-y-0.5 bg-blush/5 p-2.5 rounded-xl">
+                        <span className="font-bold">Blocking Criteria:</span>
+                        {mod.blockedReasons.map((r, i) => (
+                          <p key={i} className="pl-1 text-[11px]">• {r}</p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {onFastTrack && (
+                    <button
+                      disabled={actionBusy}
+                      onClick={() => onFastTrack(mod.id)}
+                      className="mt-3 w-full py-2 px-3 rounded-xl bg-primary text-on-primary font-headline text-xs font-bold flex items-center justify-center gap-1 hover:opacity-90 disabled:opacity-50"
+                      type="button"
+                    >
+                      <span className="material-symbols-outlined text-sm">bolt</span>
+                      Fast-Track & Unlock Module
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-2xl bg-mint/10 p-4 border border-mint/20 flex items-center gap-3">
+            <span className="material-symbols-outlined text-mint text-2xl">check_circle</span>
+            <div>
+              <p className="font-bold text-sm text-mint">No Gating Bottlenecks</p>
+              <p className="text-xs text-on-surface-variant">All current learning path modules are unlocked and accessible.</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 2. AI Dynamic Remedial & Next-Step Recommendations */}
+      {dynamicRecs.length > 0 && (
+        <div className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft">
+          <h3 className="font-headline text-lg font-bold text-on-background flex items-center gap-2 mb-2">
+            <span className="material-symbols-outlined text-primary">psychology_alt</span>
+            Adaptive Learning Recommendations
+          </h3>
+          <p className="text-sm text-on-surface-variant mb-4">
+            Generated dynamically by evaluating recent quiz attempts ($&lt; 70\%$), demonstrated skills, and path pacing.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {dynamicRecs.map((rec, i) => (
+              <div key={i} className="p-4 rounded-2xl bg-surface border border-outline-variant/20 space-y-2">
+                <div className="flex justify-between items-start gap-2">
+                  <h5 className="font-headline text-sm font-bold text-on-background">{rec.title}</h5>
+                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-primary/10 text-primary">
+                    {rec.tag}
+                  </span>
+                </div>
+                <p className="text-xs font-body text-on-surface-variant">{rec.reason}</p>
+                <div className="pt-2 flex justify-between items-center text-[10px] text-on-surface-variant font-bold">
+                  <span>Subject: {rec.subject}</span>
+                  <a href={rec.actionUrl} className="text-primary hover:underline">Inspect Action →</a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 3. Category Score Weaknesses */}
+      <div className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft">
+        <h3 className="font-headline text-lg font-bold text-on-background flex items-center gap-2 mb-2">
+          <span className="material-symbols-outlined text-butter">school</span>
+          Category Technical Performance & Skill Gaps
+        </h3>
+        <p className="text-sm text-on-surface-variant mb-6">Identifies category areas where average score is below 75%.</p>
+
+        {weakCategories.length > 0 ? (
+          <div className="space-y-4">
+            {weakCategories.map(weak => {
+              const recommendations = defaultCourses ? defaultCourses.filter(c => c.category === weak.category || c.tags?.includes(weak.category)).slice(0, 2) : [];
+              return (
+                <div key={weak.category} className="bg-surface p-5 rounded-2xl border border-blush/20">
+                  <div className="flex justify-between items-center mb-3">
+                    <h4 className="font-headline text-base font-bold text-on-background">{weak.category}</h4>
+                    <span className="bg-blush/20 text-blush px-3 py-1 rounded-full text-xs font-bold">Avg Score: {Math.round(weak.avgScore)}%</span>
+                  </div>
+                  {recommendations.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+                      {recommendations.map(rec => (
+                        <a key={rec.id} href={`/courses/${rec.slug}`} className="flex flex-col gap-1 p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/20 hover:border-primary transition-colors">
+                          <span className="font-bold text-sm text-on-background truncate">{rec.title}</span>
+                          <span className="text-xs text-on-surface-variant truncate">{rec.description}</span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-2xl bg-mint/10 p-4 border border-mint/20 flex items-center gap-3">
+            <span className="material-symbols-outlined text-mint text-2xl">verified</span>
+            <div>
+              <p className="font-bold text-sm text-mint">All Categories Performing Well (≥ 75%)</p>
+              <p className="text-xs text-on-surface-variant">The trainee has satisfied all category benchmarks.</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
-  )
+  );
 }
 
 function AdminStudentStatsPage() {
@@ -559,7 +660,13 @@ function AdminStudentStatsPage() {
                   </div>
                 </div>
 
-                <SkillGapAnalysis roomActivity={roomActivity} defaultCourses={defaultCourses} />
+                <SkillGapAndProgressionAnalysis
+                  roomActivity={roomActivity}
+                  defaultCourses={defaultCourses}
+                  progressionData={progressionData}
+                  onFastTrack={handleFastTrack}
+                  actionBusy={actionBusy}
+                />
               </div>
             )}
 
