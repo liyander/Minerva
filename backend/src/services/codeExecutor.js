@@ -181,5 +181,6 @@ export async function executeCodeOnServer(language, code, tests) {
   if (normalized === 'javascript') {
     return executeJavaScript(code, tests)
   }
-  return { supported: false }
+  const label = { c: 'C', cpp: 'C++', java: 'Java' }[normalized] || normalized || 'Selected language'
+  return { supported: false, error: `${label} execution requires a secure compiler sandbox, which is not configured on this server.` }
 }

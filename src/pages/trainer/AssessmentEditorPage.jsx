@@ -12,6 +12,8 @@ import {
 } from '../../services/training'
 import { fetchQuestionBanks } from '../../services/platform'
 import { fetchClassrooms } from '../../services/community'
+import AssessmentCodeEditor from '../../components/AssessmentCodeEditor'
+import { ASSESSMENT_LANGUAGES, getQuestionSolutionCode, getQuestionStarterCode } from '../../utils/assessmentLanguages'
 
 const AI_TYPE_OPTIONS = [
   ['single_choice', 'Single choice'], ['multiple_choice', 'Multiple choice'],
@@ -34,7 +36,7 @@ const emptyQuestion = (kind = 'quiz') => ({
   correctAnswer: [],
   starterCode: 'function solve(input) {\n  // Return your answer\n}\n',
   solutionCode: '',
-  settings: { inputFormat: '', outputFormat: '', constraints: [], examples: [] },
+  settings: { inputFormat: '', outputFormat: '', constraints: [], examples: [], starterCodes: {}, solutionCodes: {} },
   testCases: [{ input: '', expectedOutput: '', hidden: false, marks: 1 }],
 })
 
@@ -232,8 +234,10 @@ function AssessmentEditorPage() {
       if (question.questionType === 'fill_blank' && !question.correctAnswer?.length) return `Question ${index + 1} needs at least one accepted answer.`
       if (publishing && ['single_choice', 'multiple_choice', 'true_false', 'fill_blank', 'output_prediction'].includes(question.questionType) && !question.explanation?.trim()) return `Question ${index + 1} needs an explanation before publishing.`
       if (question.questionType === 'coding') {
-        if (!question.starterCode?.trim()) return `Coding question ${index + 1} needs starter code.`
-        if (publishing && !question.solutionCode?.trim()) return `Coding question ${index + 1} needs a reference solution.`
+        if (!form.allowedLanguages.length) return 'Choose at least one programming language for coding questions.'
+        const primaryLanguage = form.allowedLanguages[0]
+        if (!getQuestionStarterCode(question, primaryLanguage).trim()) return `Coding question ${index + 1} needs starter code.`
+        if (publishing && !getQuestionSolutionCode(question, primaryLanguage).trim()) return `Coding question ${index + 1} needs a reference solution for ${primaryLanguage}.`
         if (publishing && !question.settings?.inputFormat?.trim()) return `Coding question ${index + 1} needs an input format.`
         if (publishing && !question.settings?.outputFormat?.trim()) return `Coding question ${index + 1} needs an output format.`
         if (!question.testCases?.length) return `Coding question ${index + 1} needs a test case.`
@@ -432,6 +436,8 @@ function AssessmentEditorPage() {
             <label><span className="font-headline text-xs font-bold text-on-surface-variant">Difficulty</span><select className={fieldClass} onChange={(e) => setForm((f) => ({ ...f, difficulty: e.target.value }))} value={form.difficulty}><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select></label>
             <label><span className="font-headline text-xs font-bold text-on-surface-variant">Creation method</span><select className={fieldClass} onChange={(e) => setForm((f) => ({ ...f, creationMethod: e.target.value }))} value={form.creationMethod}><option value="manual">Manual</option><option value="ai_edit">AI + edit</option></select></label>
           </div>
+
+          {form.kind !== 'quiz' || questions.some((question) => question.questionType === 'coding') ? <div className="rounded-2xl bg-surface-container p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-headline text-xs font-bold text-on-surface-variant">Allowed programming languages</p><p className="mt-1 text-xs text-on-surface-variant">Learners can switch languages without losing code written in another language.</p></div><span className="text-xs text-on-surface-variant">Select one or more</span></div><div className="mt-3 flex flex-wrap gap-2">{ASSESSMENT_LANGUAGES.map((language)=><label className={`cursor-pointer rounded-full px-4 py-2 text-xs font-bold ${form.allowedLanguages.includes(language.id)?'bg-primary text-on-primary':'bg-surface-container-lowest text-on-surface'}`} key={language.id}><input checked={form.allowedLanguages.includes(language.id)} className="sr-only" onChange={(event)=>setForm((current)=>({...current,allowedLanguages:event.target.checked?[...current.allowedLanguages,language.id]:current.allowedLanguages.filter((value)=>value!==language.id)}))} type="checkbox"/>{language.label}{!language.runnable?<span className="ml-1 opacity-70">*</span>:null}</label>)}</div>{form.allowedLanguages.some((id)=>!ASSESSMENT_LANGUAGES.find((language)=>language.id===id)?.runnable)?<p className="mt-3 text-xs text-on-surface-variant">* C, C++, and Java require a configured secure compiler sandbox. If unavailable, learners receive an inline runtime message.</p>:null}</div> : null}
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <label className="block">
@@ -664,12 +670,7 @@ function AssessmentEditorPage() {
 
               {['fill_blank','short_answer'].includes(question.questionType)?<label className="block"><span className="font-headline text-xs font-bold text-on-surface-variant">Accepted answers (one per line; optional for manual short-answer grading)</span><textarea className={fieldClass} onChange={(e)=>updateQuestion(index,{correctAnswer:e.target.value.split('\n').filter(Boolean)})} rows={3} value={(question.correctAnswer||[]).join('\n')}/></label>:null}
 
-              {question.questionType==='coding'?<div className="space-y-4 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><label><span className="font-headline text-xs font-bold text-on-surface-variant">Input format</span><input className={fieldClass} onChange={(e)=>updateQuestion(index,{settings:{...(question.settings||{}),inputFormat:e.target.value}})} placeholder="e.g. JSON array of integers" value={question.settings?.inputFormat||''}/></label><label><span className="font-headline text-xs font-bold text-on-surface-variant">Output format</span><input className={fieldClass} onChange={(e)=>updateQuestion(index,{settings:{...(question.settings||{}),outputFormat:e.target.value}})} placeholder="e.g. Return an integer" value={question.settings?.outputFormat||''}/></label></div>
-                <label className="block"><span className="font-headline text-xs font-bold text-on-surface-variant">Constraints (one per line)</span><textarea className={fieldClass} onChange={(e)=>updateQuestion(index,{settings:{...(question.settings||{}),constraints:e.target.value.split('\n').filter(Boolean)}})} rows={3} value={(question.settings?.constraints||[]).join('\n')}/></label>
-                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2"><label className="block"><span className="font-headline text-xs font-bold text-on-surface-variant">Starter code</span><textarea className={`${fieldClass} font-mono`} onChange={(e)=>updateQuestion(index,{starterCode:e.target.value})} rows={8} value={question.starterCode}/></label><label className="block"><span className="font-headline text-xs font-bold text-on-surface-variant">Reference solution (trainer only)</span><textarea className={`${fieldClass} font-mono`} onChange={(e)=>updateQuestion(index,{solutionCode:e.target.value})} rows={8} value={question.solutionCode}/></label></div>
-                <div><div className="flex justify-between"><span className="font-headline text-xs font-bold">Visible and hidden test cases</span><button className="text-xs font-bold text-primary" onClick={()=>updateQuestion(index,{testCases:[...(question.testCases||[]),{input:'',expectedOutput:'',hidden:true,marks:1}]})} type="button">+ Test case</button></div>{(question.testCases||[]).map((test,testIndex)=><div className="mt-2 grid grid-cols-1 gap-2 rounded-xl bg-surface-container p-3 sm:grid-cols-[1fr_1fr_5rem_auto_auto]" key={testIndex}><input className={fieldClass} onChange={(e)=>updateQuestion(index,{testCases:question.testCases.map((t,j)=>j===testIndex?{...t,input:e.target.value}:t)})} placeholder="Input (JSON supported)" value={test.input}/><input className={fieldClass} onChange={(e)=>updateQuestion(index,{testCases:question.testCases.map((t,j)=>j===testIndex?{...t,expectedOutput:e.target.value}:t)})} placeholder="Expected output" value={test.expectedOutput}/><input className={fieldClass} min="1" onChange={(e)=>updateQuestion(index,{testCases:question.testCases.map((t,j)=>j===testIndex?{...t,marks:Number(e.target.value)}:t)})} title="Marks" type="number" value={test.marks}/><label className="flex items-center gap-1 text-xs"><input checked={test.hidden} onChange={(e)=>updateQuestion(index,{testCases:question.testCases.map((t,j)=>j===testIndex?{...t,hidden:e.target.checked}:t)})} type="checkbox"/>Hidden</label><button aria-label="Remove test case" className="text-error" onClick={()=>updateQuestion(index,{testCases:question.testCases.filter((_,j)=>j!==testIndex)})} type="button">×</button></div>)}</div>
-              </div>:null}
+              {question.questionType==='coding'?<CodingQuestionFields fieldClass={fieldClass} languages={form.allowedLanguages} onChange={(changes)=>updateQuestion(index,changes)} question={question}/>:null}
 
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <label className="block sm:col-span-3">
@@ -726,6 +727,33 @@ function AssessmentEditorPage() {
       </div>
     </main>
   )
+}
+
+function CodingQuestionFields({ fieldClass, languages, onChange, question }) {
+  const availableLanguages = (languages.length ? languages : ['javascript']).filter((id) => ASSESSMENT_LANGUAGES.some((language) => language.id === id))
+  const selectedLanguage = availableLanguages.includes(question.settings?.authoringLanguage)
+    ? question.settings.authoringLanguage
+    : availableLanguages[0]
+  const starterCode = getQuestionStarterCode(question, selectedLanguage)
+  const solutionCode = getQuestionSolutionCode(question, selectedLanguage)
+  const updateSettings = (changes) => onChange({ settings: { ...(question.settings || {}), ...changes } })
+  const updateLanguageCode = (key, value) => {
+    const codes = { ...(question.settings?.[key] || {}), [selectedLanguage]: value }
+    const legacyChanges = selectedLanguage === 'javascript'
+      ? (key === 'starterCodes' ? { starterCode: value } : { solutionCode: value })
+      : {}
+    onChange({ ...legacyChanges, settings: { ...(question.settings || {}), [key]: codes, authoringLanguage: selectedLanguage } })
+  }
+
+  return <div className="space-y-5 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><label><span className="font-headline text-xs font-bold text-on-surface-variant">Input format</span><input className={fieldClass} onChange={(event)=>updateSettings({inputFormat:event.target.value})} placeholder="e.g. JSON array of integers" value={question.settings?.inputFormat||''}/></label><label><span className="font-headline text-xs font-bold text-on-surface-variant">Output format</span><input className={fieldClass} onChange={(event)=>updateSettings({outputFormat:event.target.value})} placeholder="e.g. Return an integer" value={question.settings?.outputFormat||''}/></label></div>
+    <label className="block"><span className="font-headline text-xs font-bold text-on-surface-variant">Constraints (one per line)</span><textarea className={fieldClass} onChange={(event)=>updateSettings({constraints:event.target.value.split('\n').filter(Boolean)})} rows={3} value={(question.settings?.constraints||[]).join('\n')}/></label>
+    <div><div className="flex items-center justify-between gap-3"><div><p className="font-headline text-xs font-bold">Language-specific code</p><p className="mt-1 text-xs text-on-surface-variant">Each language keeps its own starter and reference solution.</p></div></div><div className="mt-3 flex flex-wrap gap-2">{availableLanguages.map((language)=>{const info=ASSESSMENT_LANGUAGES.find((item)=>item.id===language);return <button className={`rounded-full px-4 py-2 text-xs font-bold ${selectedLanguage===language?'bg-primary text-on-primary':'bg-surface-container text-on-surface'}`} key={language} onClick={()=>updateSettings({authoringLanguage:language})} type="button">{info?.label||language}</button>})}</div></div>
+    <AssessmentCodeEditor code={starterCode} label="Starter code shown to learners" language={selectedLanguage} onChange={(value)=>updateLanguageCode('starterCodes',value)}/>
+    <AssessmentCodeEditor code={solutionCode} label="Reference solution · trainer only" language={selectedLanguage} onChange={(value)=>updateLanguageCode('solutionCodes',value)}/>
+    <div><div className="flex justify-between"><div><span className="font-headline text-xs font-bold">Examples</span><p className="mt-1 text-xs text-on-surface-variant">These input/output examples stay the same across languages.</p></div><button className="text-xs font-bold text-primary" onClick={()=>updateSettings({examples:[...(question.settings?.examples||[]),{input:'',output:'',explanation:''}]})} type="button">+ Example</button></div>{(question.settings?.examples||[]).map((example,exampleIndex)=><div className="mt-2 grid gap-2 rounded-xl bg-surface-container p-3 sm:grid-cols-[1fr_1fr_1.5fr_auto]" key={exampleIndex}><input className={fieldClass} onChange={(event)=>updateSettings({examples:question.settings.examples.map((item,index)=>index===exampleIndex?{...item,input:event.target.value}:item)})} placeholder="Example input" value={example.input}/><input className={fieldClass} onChange={(event)=>updateSettings({examples:question.settings.examples.map((item,index)=>index===exampleIndex?{...item,output:event.target.value}:item)})} placeholder="Example output" value={example.output}/><input className={fieldClass} onChange={(event)=>updateSettings({examples:question.settings.examples.map((item,index)=>index===exampleIndex?{...item,explanation:event.target.value}:item)})} placeholder="Explanation (optional)" value={example.explanation||''}/><button aria-label="Remove example" className="self-center text-error" onClick={()=>updateSettings({examples:question.settings.examples.filter((_,index)=>index!==exampleIndex)})} type="button">×</button></div>)}</div>
+    <div><div className="flex justify-between"><span className="font-headline text-xs font-bold">Visible and hidden test cases</span><button className="text-xs font-bold text-primary" onClick={()=>onChange({testCases:[...(question.testCases||[]),{input:'',expectedOutput:'',hidden:true,marks:1}]})} type="button">+ Test case</button></div>{(question.testCases||[]).map((test,testIndex)=><div className="mt-2 grid grid-cols-1 gap-2 rounded-xl bg-surface-container p-3 sm:grid-cols-[1fr_1fr_5rem_auto_auto]" key={testIndex}><input className={fieldClass} onChange={(event)=>onChange({testCases:question.testCases.map((item,index)=>index===testIndex?{...item,input:event.target.value}:item)})} placeholder="Input (JSON supported)" value={test.input}/><input className={fieldClass} onChange={(event)=>onChange({testCases:question.testCases.map((item,index)=>index===testIndex?{...item,expectedOutput:event.target.value}:item)})} placeholder="Expected output" value={test.expectedOutput}/><input className={fieldClass} min="1" onChange={(event)=>onChange({testCases:question.testCases.map((item,index)=>index===testIndex?{...item,marks:Number(event.target.value)}:item)})} title="Marks" type="number" value={test.marks}/><label className="flex items-center gap-1 text-xs"><input checked={test.hidden} onChange={(event)=>onChange({testCases:question.testCases.map((item,index)=>index===testIndex?{...item,hidden:event.target.checked}:item)})} type="checkbox"/>Hidden</label><button aria-label="Remove test case" className="text-error" onClick={()=>onChange({testCases:question.testCases.filter((_,index)=>index!==testIndex)})} type="button">×</button></div>)}</div>
+  </div>
 }
 
 export default AssessmentEditorPage
