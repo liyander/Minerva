@@ -670,7 +670,7 @@ function TrainerWorkspacePage() {
               <div className="flex gap-2">
                 <button
                   className={`${pill} bg-primary text-on-primary`}
-                  onClick={createAssessment}
+                  onClick={() => navigate('/trainer/assessments/new')}
                   type="button"
                 >
                   Create assessment
