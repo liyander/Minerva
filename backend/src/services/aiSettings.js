@@ -3,12 +3,6 @@ import { pool } from '../db/pool.js'
 
 const curatedAiModels = [
   {
-    id: 'moonshotai/kimi-k2-thinking',
-    label: 'Kimi K2 Thinking',
-    provider: 'NVIDIA',
-    description: 'Default reasoning model for skill generation, evaluation, and platform assistants.',
-  },
-  {
     id: 'openai/gpt-oss-20b',
     label: 'GPT OSS 20B',
     provider: 'NVIDIA',

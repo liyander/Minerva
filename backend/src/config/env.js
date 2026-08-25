@@ -42,7 +42,7 @@ export const env = {
   nvidiaApiKey: process.env.NVIDIA_API_KEY || '',
   publicApiKeys: parseApiKeys(process.env.PUBLIC_API_KEYS || process.env.PUBLIC_API_KEY || ''),
   aiBaseUrl: process.env.AI_BASE_URL || 'https://integrate.api.nvidia.com/v1',
-  aiModel: process.env.AI_MODEL || 'moonshotai/kimi-k2-thinking',
+  aiModel: process.env.AI_MODEL || 'openai/gpt-oss-120b',
   aiTemperature: Number(process.env.AI_TEMPERATURE || 1),
   aiTopP: Number(process.env.AI_TOP_P || 0.9),
   aiMaxTokens: Number(process.env.AI_MAX_TOKENS || 16384),
