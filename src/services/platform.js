@@ -145,17 +145,15 @@ export const fetchPublicShare = (token) => apiFetch(`/experience/public/${token}
 export const fetchExportList = () => apiFetch('/reports/exports')
 export const fetchExportData = (key) => apiFetch(`/reports/exports/${key}?format=json`)
 export const fetchTrainerDashboard = () => apiFetch('/reports/trainer/me')
-export const createExportJob = (payload) => apiFetch('/reports/jobs', { method: 'POST', ...json(payload) })
-export const fetchExportJob = (id) => apiFetch(`/reports/jobs/${id}`)
 export const fetchAuditLog = (params) => apiFetch(`/reports/audit${query(params)}`)
 export const fetchAuditActions = () => apiFetch('/reports/audit/actions')
 export const fetchMailStatus = () => apiFetch('/reports/mail/status')
 export const runReminders = () => apiFetch('/reports/mail/reminders', { method: 'POST' })
 export const runDigest = () => apiFetch('/reports/mail/digest', { method: 'POST' })
 
-/** Streams a CSV export straight to the browser's downloads. */
-export async function downloadExport(key, filename) {
-  const response = await fetch(`${API_BASE_URL}/reports/exports/${key}`, {
+/** Streams an export straight to the browser's downloads. */
+export async function downloadExport(key, filename, format = 'csv') {
+  const response = await fetch(`${API_BASE_URL}/reports/exports/${key}?format=${format}`, {
     headers: { Authorization: `Bearer ${getAuthToken()}` },
   })
   if (!response.ok) throw new Error('Export failed')
@@ -164,24 +162,7 @@ export async function downloadExport(key, filename) {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = filename || `${key}.csv`
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
-  URL.revokeObjectURL(url)
-}
-
-export async function downloadExportJob(id, filename) {
-  const response = await fetch(`${API_BASE_URL}/reports/download/${id}`, {
-    headers: { Authorization: `Bearer ${getAuthToken()}` },
-  })
-  if (!response.ok) throw new Error('File download failed')
-
-  const blob = await response.blob()
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename || `report_${id}`
+  link.download = filename || `${key}.${format}`
   document.body.appendChild(link)
   link.click()
   link.remove()

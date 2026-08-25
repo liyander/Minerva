@@ -32,6 +32,62 @@ function sendCsv(res, filename, columns, rows) {
   return res.send(toCsv(columns, rows))
 }
 
+import pdfmake from 'pdfmake'
+
+const fonts = {
+  Roboto: {
+    normal: 'Helvetica',
+    bold: 'Helvetica-Bold',
+    italics: 'Helvetica-Oblique',
+    bolditalics: 'Helvetica-BoldOblique'
+  }
+}
+pdfmake.setFonts(fonts)
+
+async function sendPdf(res, filename, columns, rows, reportType) {
+  res.setHeader('Content-Type', 'application/pdf')
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+
+  const tableBody = []
+  
+  // Header row
+  tableBody.push(columns.map(c => ({ text: c.label, style: 'tableHeader' })))
+  
+  // Data rows
+  for (const row of rows) {
+    tableBody.push(columns.map(c => ({ text: String(row[c.key] || '') })))
+  }
+
+  const docDefinition = {
+    defaultStyle: { font: 'Roboto', fontSize: 10 },
+    pageOrientation: 'landscape',
+    header: { text: `Minerva Report: ${reportType.toUpperCase()}`, margin: [40, 20] },
+    footer: (currentPage, pageCount) => ({
+      text: `Generated on ${new Date().toLocaleString()} | Page ${currentPage} of ${pageCount}`,
+      margin: [40, 20],
+      alignment: 'center'
+    }),
+    content: [
+      { text: 'Filters Applied: None', margin: [0, 0, 0, 15] },
+      {
+        table: {
+          headerRows: 1,
+          body: tableBody
+        }
+      }
+    ],
+    styles: {
+      tableHeader: { bold: true, fillColor: '#eeeeee' }
+    }
+  }
+
+  const pdfDoc = pdfmake.createPdf(docDefinition)
+  const stream = await pdfDoc.getStream()
+  
+  stream.pipe(res)
+  stream.end()
+}
+
 import { EXPORTS } from '../config/exports.js'
 import fs from 'fs'
 import path from 'path'
@@ -61,49 +117,12 @@ router.get('/exports/:key', requireTrainer, async (req, res) => {
     return res.json({ key: req.params.key, columns: config.columns, rows })
   }
 
-  return sendCsv(res, config.filename, config.columns, rows)
-})
-
-router.post('/jobs', requireTrainer, async (req, res) => {
-  const { reportType, format = 'csv', filters = {} } = req.body
-  const config = EXPORTS[reportType]
-  
-  if (!config) return res.status(404).json({ message: 'Unknown report type' })
-  if (config.role === 'admin' && !isRole(req.user.role, ROLES.ADMIN)) {
-    return res.status(403).json({ message: 'That export is admin-only' })
+  if (req.query.format === 'pdf') {
+    const filename = `${config.filename.split('.')[0]}.pdf`
+    return await sendPdf(res, filename, config.columns, rows, req.params.key)
   }
 
-  const [result] = await pool.query(
-    'INSERT INTO report_jobs (user_id, report_type, format, filters_json, status) VALUES (?, ?, ?, ?, "pending")',
-    [req.user.id, reportType, format, JSON.stringify(filters)]
-  )
-
-  res.json({ jobId: result.insertId, status: 'pending' })
-})
-
-router.get('/jobs/:id', requireTrainer, async (req, res) => {
-  const [rows] = await pool.query('SELECT id, report_type, format, status, error_message, created_at, completed_at FROM report_jobs WHERE id = ? AND user_id = ?', [req.params.id, req.user.id])
-  if (!rows.length) return res.status(404).json({ message: 'Job not found' })
-  res.json(rows[0])
-})
-
-router.get('/download/:id', requireTrainer, async (req, res) => {
-  const [rows] = await pool.query('SELECT file_url, format, report_type FROM report_jobs WHERE id = ? AND user_id = ? AND status = "completed"', [req.params.id, req.user.id])
-  if (!rows.length) return res.status(404).json({ message: 'File not ready or not found' })
-
-  const job = rows[0]
-  const filePath = path.join(process.cwd(), job.file_url)
-
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).json({ message: 'File has been deleted' })
-  }
-
-  const contentType = job.format === 'pdf' ? 'application/pdf' : 'text/csv'
-  res.setHeader('Content-Type', contentType)
-  res.setHeader('Content-Disposition', `attachment; filename="${job.report_type}.${job.format}"`)
-  
-  const fileStream = fs.createReadStream(filePath)
-  fileStream.pipe(res)
+  return sendCsv(res, `${config.filename.split('.')[0]}.csv`, config.columns, rows)
 })
 
 /* ------------------------------------------------- trainer own dashboard --- */

@@ -2,9 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PageHeader from '../../components/PageHeader'
 import {
-  createExportJob,
-  fetchExportJob,
-  downloadExportJob,
+  downloadExport,
   fetchAuditActions,
   fetchAuditLog,
   fetchExportData,
@@ -85,24 +83,9 @@ function AdminReportsPage() {
     setBusy(busyKey)
     setError('')
     try {
-      const { jobId } = await createExportJob({ reportType: key, format })
-      setNotice(`Job #${jobId} queued. Generating ${format.toUpperCase()}...`)
-      
-      let jobStatus = 'pending'
-      let errorMsg = ''
-      while (jobStatus === 'pending' || jobStatus === 'processing') {
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        const statusCheck = await fetchExportJob(jobId)
-        jobStatus = statusCheck.status
-        errorMsg = statusCheck.error_message
-      }
-      
-      if (jobStatus === 'failed') {
-        throw new Error(errorMsg || 'Job failed')
-      }
-      
-      const filename = EXPORT_META[key]?.filename ? `${EXPORT_META[key].filename}.${format}` : `${key}.${format}`
-      await downloadExportJob(jobId, filename)
+      const filename = EXPORT_META[key]?.filename ? `${EXPORT_META[key].filename.split('.')[0]}.${format}` : `${key}.${format}`
+      setNotice(`Generating ${format.toUpperCase()}...`)
+      await downloadExport(key, filename, format)
       setNotice(`${EXPORT_META[key]?.label || key} downloaded successfully.`)
     } catch (downloadError) {
       setError(downloadError?.message || 'Download failed.')
