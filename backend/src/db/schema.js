@@ -546,7 +546,7 @@ const COLUMN_MIGRATIONS = [
   ['community_messages', 'attachment_type', 'VARCHAR(120) NULL'],
   ['community_messages', 'attachment_size', 'INT DEFAULT 0'],
   ['community_messages', 'attachment_data', 'LONGTEXT NULL'],
-  ['community_channels', 'scope_classroom_id', 'BIGINT GENERATED ALWAYS AS (IFNULL(classroom_id, 0)) STORED'],
+  ['community_channels', 'scope_classroom_id', 'BIGINT GENERATED ALWAYS AS (IFNULL(classroom_id, 0)) VIRTUAL'],
 ]
 
 async function addColumnIfMissing(conn, tableName, columnName, definitionSql) {
