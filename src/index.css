@@ -161,7 +161,12 @@ body {
     display: none !important;
     visibility: hidden !important;
 }
-.goog-text-highlight {
+.goog-text-highlight,
+font {
+    background-color: transparent !important;
+    box-shadow: none !important;
+}
+font:hover {
     background-color: transparent !important;
     box-shadow: none !important;
 }
