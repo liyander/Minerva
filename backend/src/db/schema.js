@@ -15,6 +15,9 @@ import {
   EXPERIENCE_TABLE_DDL,
   EXPERIENCE_TABLES,
 } from './experienceSchema.js'
+import { REPORTING_TABLE_DDL, REPORTING_TABLES } from './reportingSchema.js'
+
+
 
 // Single source of truth for the database shape. Both the CLI initialiser and
 // the admin "Database" screen build the schema from here, so they can never
@@ -634,14 +637,18 @@ export async function createCoreTables(conn) {
   await conn.query(PLATFORM_TABLE_DDL)
   // Integrated learning-experience tables depend on platform cohorts/files.
   await conn.query(EXPERIENCE_TABLE_DDL)
+  // Background reporting jobs
+  await conn.query(REPORTING_TABLE_DDL)
   return (
     CORE_TABLES.length
     + TRAINING_TABLES.length
     + COMMUNITY_TABLES.length
     + PLATFORM_TABLES.length
     + EXPERIENCE_TABLES.length
+    + REPORTING_TABLES.length
   )
 }
+
 
 export async function applyColumnMigrations(conn) {
   const applied = []

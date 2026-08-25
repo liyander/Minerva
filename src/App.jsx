@@ -428,6 +428,7 @@ function App() {
               element={<GradingQueuePage />}
             />
             <Route path="/trainer/question-banks" element={<QuestionBankPage />} />
+            <Route path="/admin/reports" element={<AdminReportsPage />} />
             <Route path="/library" element={<TrainerLibraryPage />} />
             <Route path="/assessments" element={<AssessmentsPage />} />
             <Route path="/assessments/:assessmentId" element={<AssessmentAttemptPage />} />

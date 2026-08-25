@@ -571,9 +571,19 @@ function TrainerWorkspacePage() {
 
         {!isLoading && tab === 'reports' ? (
           <section className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft space-y-6">
-            <div>
-              <h2 className="font-headline text-lg font-extrabold text-on-background">Trainer reports</h2>
-              <p className="mt-1 font-body text-sm text-on-surface-variant">Performance data is limited to content and learners connected to your teaching activity.</p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="font-headline text-lg font-extrabold text-on-background">Trainer reports</h2>
+                <p className="mt-1 font-body text-sm text-on-surface-variant">Performance data is limited to content and learners connected to your teaching activity.</p>
+              </div>
+              <button
+                className={`${pill} bg-primary text-on-primary`}
+                onClick={() => navigate('/admin/reports')}
+                type="button"
+              >
+                <span className="material-symbols-outlined text-sm">download</span>
+                Export Data
+              </button>
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {[
@@ -655,15 +665,17 @@ function TrainerWorkspacePage() {
           <section className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="font-headline text-lg font-extrabold text-on-background">
-                Your questionnaires
+                Your assessments
               </h2>
-              <button
-                className={`${pill} bg-primary text-on-primary`}
-                onClick={() => navigate('/trainer/assessments/new')}
-                type="button"
-              >
-                New questionnaire
-              </button>
+              <div className="flex gap-2">
+                <button
+                  className={`${pill} bg-primary text-on-primary`}
+                  onClick={createAssessment}
+                  type="button"
+                >
+                  Create assessment
+                </button>
+              </div>
             </div>
 
             {assessments.length === 0 ? (

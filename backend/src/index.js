@@ -4,6 +4,7 @@ import { testConnection, initializeDatabaseIfNeeded } from './db/pool.js'
 import { setupRoomTerminalWebSocket } from './routes/rooms.routes.js'
 import { setupCommunityWebSocket } from './routes/community.routes.js'
 import { startReminderSchedule } from './services/reminders.js'
+import './services/reportWorker.js'
 
 async function start() {
   try {
