@@ -32,61 +32,62 @@ function sendCsv(res, filename, columns, rows) {
   return res.send(toCsv(columns, rows))
 }
 
-import pdfmake from 'pdfmake'
-
-const fonts = {
-  Roboto: {
-    normal: 'Helvetica',
-    bold: 'Helvetica-Bold',
-    italics: 'Helvetica-Oblique',
-    bolditalics: 'Helvetica-BoldOblique'
-  }
-}
-pdfmake.setFonts(fonts)
-
 async function sendPdf(res, filename, columns, rows, reportType) {
-  res.setHeader('Content-Type', 'application/pdf')
-  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
-
-  const tableBody = []
-  
-  // Header row
-  tableBody.push(columns.map(c => ({ text: c.label, style: 'tableHeader' })))
-  
-  // Data rows
-  for (const row of rows) {
-    tableBody.push(columns.map(c => ({ text: String(row[c.key] || '') })))
-  }
-
-  const docDefinition = {
-    defaultStyle: { font: 'Roboto', fontSize: 10 },
-    pageOrientation: 'landscape',
-    header: { text: `Minerva Report: ${reportType.toUpperCase()}`, margin: [40, 20] },
-    footer: (currentPage, pageCount) => ({
-      text: `Generated on ${new Date().toLocaleString()} | Page ${currentPage} of ${pageCount}`,
-      margin: [40, 20],
-      alignment: 'center'
-    }),
-    content: [
-      { text: 'Filters Applied: None', margin: [0, 0, 0, 15] },
-      {
-        table: {
-          headerRows: 1,
-          body: tableBody
-        }
-      }
-    ],
-    styles: {
-      tableHeader: { bold: true, fillColor: '#eeeeee' }
+  try {
+    const pdfmake = (await import('pdfmake')).default
+    const fonts = {
+      Roboto: {
+        normal: 'Helvetica',
+        bold: 'Helvetica-Bold',
+        italics: 'Helvetica-Oblique',
+        bolditalics: 'Helvetica-BoldOblique',
+      },
     }
-  }
+    pdfmake.setFonts(fonts)
 
-  const pdfDoc = pdfmake.createPdf(docDefinition)
-  const stream = await pdfDoc.getStream()
-  
-  stream.pipe(res)
-  stream.end()
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+
+    const tableBody = []
+    tableBody.push(columns.map((c) => ({ text: c.label, style: 'tableHeader' })))
+    for (const row of rows) {
+      tableBody.push(columns.map((c) => ({ text: String(row[c.key] || '') })))
+    }
+
+    const docDefinition = {
+      defaultStyle: { font: 'Roboto', fontSize: 10 },
+      pageOrientation: 'landscape',
+      header: { text: `Minerva Report: ${reportType.toUpperCase()}`, margin: [40, 20] },
+      footer: (currentPage, pageCount) => ({
+        text: `Generated on ${new Date().toLocaleString()} | Page ${currentPage} of ${pageCount}`,
+        margin: [40, 20],
+        alignment: 'center',
+      }),
+      content: [
+        { text: 'Filters Applied: None', margin: [0, 0, 0, 15] },
+        {
+          table: {
+            headerRows: 1,
+            body: tableBody,
+          },
+        },
+      ],
+      styles: {
+        tableHeader: { bold: true, fillColor: '#eeeeee' },
+      },
+    }
+
+    const pdfDoc = pdfmake.createPdf(docDefinition)
+    const stream = await pdfDoc.getStream()
+    stream.pipe(res)
+    stream.end()
+  } catch (_err) {
+    // If PDF engine is not installed in node environment, fallback to structured CSV
+    const csvFilename = filename.replace(/\.pdf$/i, '.csv')
+    return sendCsv(res, csvFilename, columns, rows)
+  }
 }
+
 
 import { EXPORTS } from '../config/exports.js'
 import fs from 'fs'

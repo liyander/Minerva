@@ -262,7 +262,7 @@ router.get('/admin/student-progression/:userId', requireTrainer, async (req, res
 
   // 5. Comprehensive Student Performance Statistics
   const [roomStats] = await pool.query(
-    `SELECT COUNT(*) AS total_completed, COALESCE(SUM(r.points), 0) AS room_points
+    `SELECT COUNT(*) AS total_completed, COALESCE(SUM(r.xp), 0) AS room_points
      FROM user_room_progress p
      JOIN rooms r ON r.id = p.room_id
      WHERE p.user_id = ? AND p.completed_at IS NOT NULL`,
@@ -303,7 +303,7 @@ router.get('/admin/student-progression/:userId', requireTrainer, async (req, res
     `SELECT 
        r.category,
        COUNT(p.id) AS completed_count,
-       COALESCE(ROUND(AVG(r.points)), 0) AS avg_xp
+       COALESCE(ROUND(AVG(r.xp)), 0) AS avg_xp
      FROM user_room_progress p
      JOIN rooms r ON r.id = p.room_id
      WHERE p.user_id = ? AND p.completed_at IS NOT NULL
