@@ -40,6 +40,11 @@ import AssessmentResultsPage from './pages/trainer/AssessmentResultsPage'
 import AssignmentEditorPage from './pages/trainer/AssignmentEditorPage'
 import GradingQueuePage from './pages/trainer/GradingQueuePage'
 import QuestionBankPage from './pages/trainer/QuestionBankPage'
+import TrainerContestsPage from './pages/trainer/TrainerContestsPage'
+import ContestEditorPage from './pages/trainer/ContestEditorPage'
+import ContestHostPage from './pages/trainer/ContestHostPage'
+import TraineeContestsPage from './pages/trainee/TraineeContestsPage'
+import ContestPlayPage from './pages/trainee/ContestPlayPage'
 import AssessmentsPage from './pages/AssessmentsPage'
 import AssessmentAttemptPage from './pages/AssessmentAttemptPage'
 import AssignmentsPage from './pages/AssignmentsPage'
@@ -413,6 +418,12 @@ function App() {
             <Route path="/register" element={<Navigate to="/trainer" replace />} />
             <Route path="/" element={<Navigate to="/trainer" replace />} />
             <Route path="/trainer" element={<TrainerWorkspacePage />} />
+            <Route path="/trainer/contests" element={<TrainerContestsPage />} />
+            <Route path="/trainer/contests/new" element={<ContestEditorPage />} />
+            <Route path="/trainer/contests/:id/edit" element={<ContestEditorPage />} />
+            <Route path="/trainer/contests/:id/host" element={<ContestHostPage />} />
+            <Route path="/contests" element={<TraineeContestsPage />} />
+            <Route path="/contests/:id/play" element={<ContestPlayPage />} />
             <Route path="/trainer/assessments/new" element={<AssessmentEditorPage />} />
             <Route path="/trainer/assessments/:assessmentId" element={<AssessmentEditorPage />} />
             <Route
@@ -429,6 +440,7 @@ function App() {
             <Route path="/library" element={<TrainerLibraryPage />} />
             <Route path="/assessments" element={<AssessmentsPage />} />
             <Route path="/assessments/:assessmentId" element={<AssessmentAttemptPage />} />
+            <Route path="/leaderboard" element={<LeaderboardPage />} />
             <Route path="/my-profile" element={<ProfessionalProfilePage />} />
             <Route path="/learn/paths" element={<LearningPathsPage />} />
             <Route path="/learn/path/:pathId/module/:moduleId" element={<ModuleDetailPage />} />
@@ -598,6 +610,8 @@ function App() {
             element={<NotesPage />}
           />
           <Route path="/community" element={<CommunityPage />} />
+          <Route path="/contests" element={<TraineeContestsPage />} />
+          <Route path="/contests/:id/play" element={<ContestPlayPage />} />
           <Route path="/assessments" element={<AssessmentsPage />} />
           <Route path="/assessments/:assessmentId" element={<AssessmentAttemptPage />} />
           <Route path="/assignments" element={<AssignmentsPage />} />

@@ -3,6 +3,7 @@ import { env } from './config/env.js'
 import { testConnection, initializeDatabaseIfNeeded } from './db/pool.js'
 import { setupRoomTerminalWebSocket } from './routes/rooms.routes.js'
 import { setupCommunityWebSocket } from './routes/community.routes.js'
+import { setupContestWebSocket } from './routes/contests.routes.js'
 import { startReminderSchedule } from './services/reminders.js'
 
 async function start() {
@@ -18,6 +19,7 @@ async function start() {
 
     setupRoomTerminalWebSocket(server)
     setupCommunityWebSocket(server)
+    setupContestWebSocket(server)
     startReminderSchedule()
 
     server.on('error', (error) => {

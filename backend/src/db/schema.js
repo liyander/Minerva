@@ -15,6 +15,11 @@ import {
   EXPERIENCE_TABLE_DDL,
   EXPERIENCE_TABLES,
 } from './experienceSchema.js'
+import {
+  CONTEST_COLUMN_MIGRATIONS,
+  CONTEST_TABLE_DDL,
+  CONTEST_TABLES,
+} from './contestSchema.js'
 
 // Single source of truth for the database shape. Both the CLI initialiser and
 // the admin "Database" screen build the schema from here, so they can never
@@ -487,6 +492,7 @@ export const EXPECTED_TABLES = [
   ...COMMUNITY_TABLES,
   ...PLATFORM_TABLES,
   ...EXPERIENCE_TABLES,
+  ...CONTEST_TABLES,
 ]
 
 // Additive migrations for databases created by older versions.
@@ -634,12 +640,15 @@ export async function createCoreTables(conn) {
   await conn.query(PLATFORM_TABLE_DDL)
   // Integrated learning-experience tables depend on platform cohorts/files.
   await conn.query(EXPERIENCE_TABLE_DDL)
+  // Contest and Live Quiz tables
+  await conn.query(CONTEST_TABLE_DDL)
   return (
     CORE_TABLES.length
     + TRAINING_TABLES.length
     + COMMUNITY_TABLES.length
     + PLATFORM_TABLES.length
     + EXPERIENCE_TABLES.length
+    + CONTEST_TABLES.length
   )
 }
 

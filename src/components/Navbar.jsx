@@ -23,10 +23,12 @@ function Navbar({ config, isSidebarOpen, onLogout, onToggleSidebar }) {
   const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false)
 
   const trainerPageTitle = (() => {
+    if (location.pathname.startsWith('/trainer/contests')) return 'Contests & Quizzes'
     if (location.pathname.startsWith('/trainer/question-banks')) return 'Question banks'
     if (location.pathname.includes('/grading')) return 'Grading queue'
     if (location.pathname.startsWith('/trainer/assignments')) return 'Assignments'
     if (location.pathname.startsWith('/trainer/assessments')) return 'Assessments'
+    if (location.pathname === '/leaderboard') return 'Leaderboard'
     if (location.pathname === '/learn') return 'My courses'
     if (location.pathname === '/community') return 'Classrooms'
     if (location.pathname === '/my-profile') return 'Professional profile'
