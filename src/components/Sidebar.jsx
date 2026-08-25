@@ -57,7 +57,7 @@ function Sidebar({ config, isSidebarOpen, onClose }) {
     }
 
     void loadSessions()
-    const intervalId = window.setInterval(loadSessions, 15000)
+    const intervalId = window.setInterval(loadSessions, 45000)
 
     return () => {
       cancelled = true

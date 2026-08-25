@@ -233,7 +233,9 @@ function App() {
       }
     }
 
-    const intervalId = window.setInterval(syncNow, 8000)
+    // Every tick re-downloads the full course, path and resource catalogue, so
+    // this is deliberately infrequent; edits also push updates through events.
+    const intervalId = window.setInterval(syncNow, 120000)
     void syncNow()
     return () => {
       cancelled = true

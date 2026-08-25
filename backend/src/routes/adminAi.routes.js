@@ -4,6 +4,7 @@ import { pool } from '../db/pool.js'
 import { env } from '../config/env.js'
 import { authenticate, requireAdmin } from '../middleware/auth.js'
 import { getAiRuntimeConfig } from '../services/aiSettings.js'
+import { aiSystemMessage, aiTaskMessage } from '../services/aiPrompts.js'
 
 const router = Router()
 const pendingActionByUser = new Map()
@@ -1975,15 +1976,8 @@ router.post('/chat', async (req, res, next) => {
       max_tokens: Math.min(aiConfig.maxTokens, 2000),
       stream: false,
       messages: [
-        {
-          role: 'system',
-          content:
-            'You are Admin AI for Incognitrix Academy. Answer all user questions helpfully, including general and platform-specific questions. You can also perform admin content operations. If the user explicitly asks to create platform content, respond in JSON using this schema: {"assistantReply":"string","action":{"type":"none|create_room|create_career_path|create_module","payload":{}}}. For all normal Q&A, respond in plain text markdown (not JSON): use clear headings, short paragraphs, bullet or numbered lists, and tables only when helpful; avoid single long run-on lines. Use action "none" unless the user clearly requests creation. For create_room payload include title and optional category, level, description, tags, requiredKeywords, missionOverview, remediationProtocols, vulnerabilityDefinition, vulnerabilityImpact, technicalDeepDive, estimateTime, environment, xp. For create_career_path payload include title and optional description, learningPathLevel, estimatedHours, icon, color. For create_module payload include careerPathId (or pathId), title and optional phase, description, rooms array.',
-        },
-        {
-          role: 'system',
-          content: `Current platform insights: ${JSON.stringify(insights)}`,
-        },
+        aiSystemMessage(),
+        aiTaskMessage('adminAssistant', { platformInsights: insights }),
         ...history.map((entry) => ({
           role: entry.role,
           content: entry.message,

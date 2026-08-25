@@ -3,58 +3,28 @@ import { pool } from '../db/pool.js'
 
 const curatedAiModels = [
   {
-    id: 'openai/gpt-oss-20b',
-    label: 'GPT OSS 20B',
-    provider: 'NVIDIA',
-    description: 'OpenAI open-weight model available through NVIDIA NIM chat completions.',
-  },
-  {
     id: 'openai/gpt-oss-120b',
     label: 'GPT OSS 120B',
     provider: 'NVIDIA',
-    description: 'Larger OpenAI open-weight model for deeper reasoning workloads.',
+    description: 'Default model for content generation, evaluation and the platform assistants.',
   },
   {
-    id: 'deepseek-ai/deepseek-v4-flash',
-    label: 'DeepSeek V4 Flash',
+    id: 'openai/gpt-oss-20b',
+    label: 'GPT OSS 20B',
     provider: 'NVIDIA',
-    description: 'Fast DeepSeek chat model for responsive assistant tasks.',
+    description: 'Smaller and faster sibling of GPT OSS 120B; good for responsive chat.',
   },
   {
-    id: 'deepseek-ai/deepseek-v4-pro',
-    label: 'DeepSeek V4 Pro',
+    id: 'moonshotai/kimi-k3',
+    label: 'Kimi K3',
     provider: 'NVIDIA',
-    description: 'Reasoning-focused option for detailed analysis and evaluation.',
+    description: 'Reasoning-oriented model. Successor to Kimi K2 Thinking; slower to respond.',
   },
   {
-    id: 'qwen/qwen3-coder-480b-a35b-instruct',
-    label: 'Qwen3 Coder 480B A35B Instruct',
+    id: 'mistralai/mistral-nemotron',
+    label: 'Mistral Nemotron',
     provider: 'NVIDIA',
-    description: 'Large coding and instruction model for technical tasks.',
-  },
-  {
-    id: 'qwen/qwen3-next-80b-a3b-thinking',
-    label: 'Qwen3 Next 80B A3B Thinking',
-    provider: 'NVIDIA',
-    description: 'Thinking-oriented Qwen model for analysis and multi-step reasoning.',
-  },
-  {
-    id: 'qwen/qwq-32b',
-    label: 'QwQ 32B',
-    provider: 'NVIDIA',
-    description: 'Compact reasoning model for structured assessment and feedback.',
-  },
-  {
-    id: 'meta/llama-3.3-70b-instruct',
-    label: 'Llama 3.3 70B Instruct',
-    provider: 'NVIDIA',
-    description: 'General instruction model for stable Q&A and content operations.',
-  },
-  {
-    id: 'nvidia/llama-3.3-nemotron-super-49b-v1.5',
-    label: 'Llama 3.3 Nemotron Super 49B v1.5',
-    provider: 'NVIDIA',
-    description: 'NVIDIA Nemotron model for general reasoning and assistant workflows.',
+    description: 'Fastest of the curated options; general chat and instruction following.',
   },
   {
     id: 'nvidia/nemotron-3-super-120b-a12b',
@@ -63,18 +33,31 @@ const curatedAiModels = [
     description: 'High-capacity NVIDIA model for complex reasoning tasks.',
   },
   {
-    id: 'mistralai/mistral-nemotron',
-    label: 'Mistral Nemotron',
+    id: 'nvidia/llama-3.3-nemotron-super-49b-v1.5',
+    label: 'Llama 3.3 Nemotron Super 49B v1.5',
     provider: 'NVIDIA',
-    description: 'Mistral/NVIDIA model option for general chat and instruction following.',
+    description: 'NVIDIA Nemotron model for general reasoning and assistant workflows.',
   },
   {
-    id: 'z-ai/glm5.1',
-    label: 'GLM 5.1',
+    id: 'meta/llama-3.3-70b-instruct',
+    label: 'Llama 3.3 70B Instruct',
     provider: 'NVIDIA',
-    description: 'General chat model available through NVIDIA NIM.',
+    description: 'General instruction model for stable Q&A and content operations.',
   },
 ]
+
+// Retired upstream and removed from the picker on 2026-08-25 after the provider
+// began returning 410 Gone. Kept here so an existing saved configuration can be
+// recognised and migrated rather than failing silently.
+export const retiredAiModels = {
+  'moonshotai/kimi-k2-thinking': 'moonshotai/kimi-k3',
+  'deepseek-ai/deepseek-v4-flash': 'openai/gpt-oss-20b',
+  'deepseek-ai/deepseek-v4-pro': 'openai/gpt-oss-120b',
+  'qwen/qwen3-coder-480b-a35b-instruct': 'openai/gpt-oss-120b',
+  'qwen/qwen3-next-80b-a3b-thinking': 'moonshotai/kimi-k3',
+  'qwen/qwq-32b': 'openai/gpt-oss-20b',
+  'z-ai/glm5.1': 'mistralai/mistral-nemotron',
+}
 
 const selectableAiModels = [
   ...curatedAiModels,
@@ -256,6 +239,13 @@ function parseJsonField(value, fallback = {}) {
 
 function normalizeModelId(value) {
   const model = String(value || '').trim()
+
+  // A configuration saved before a model was retired upstream would otherwise
+  // keep sending requests that the provider answers with 410 Gone.
+  if (retiredAiModels[model]) {
+    return retiredAiModels[model]
+  }
+
   const allowedModels = new Set([
     env.aiModel,
     ...availableAiModels.map((item) => item.id),

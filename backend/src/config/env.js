@@ -76,7 +76,10 @@ export const env = {
     passwordResetMinutes: Number(process.env.PASSWORD_RESET_MINUTES || 60),
     loginAttemptsPerWindow: Number(process.env.LOGIN_ATTEMPTS_PER_WINDOW || 10),
     rateWindowMinutes: Number(process.env.RATE_WINDOW_MINUTES || 15),
-    apiRequestsPerWindow: Number(process.env.API_REQUESTS_PER_WINDOW || 1200),
+    // Generous because this is now a per-user budget, not a shared per-IP one.
+    apiRequestsPerWindow: Number(process.env.API_REQUESTS_PER_WINDOW || 5000),
+    // Set to the number of proxy hops (e.g. 1 behind nginx). 0 disables.
+    trustProxy: Number(process.env.TRUST_PROXY || 0),
   },
   db: {
     host: process.env.DB_HOST || 'localhost',

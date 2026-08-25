@@ -443,7 +443,7 @@ function AssistantChatbot() {
               <p className="text-[11px] text-on-surface-variant">
                 {isExpanded
                   ? 'Expanded view for longer prompts and deeper analysis'
-                  : 'Answers stay scoped to your courses'}
+                  : 'Ask about any subject you are studying'}
               </p>
               <div className="mt-3 inline-flex overflow-hidden rounded-full border border-outline-variant bg-surface-container-low text-xs font-bold">
                 <button

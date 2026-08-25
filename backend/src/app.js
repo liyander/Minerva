@@ -1,7 +1,7 @@
 import cors from 'cors'
 import express from 'express'
 import helmet from 'helmet'
-import rateLimit from 'express-rate-limit'
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit'
 import { env } from './config/env.js'
 import { databaseErrorMessage, wrapRouterAsync } from './middleware/asyncRouter.js'
 import authRoutes from './routes/auth.routes.js'
@@ -55,9 +55,11 @@ const corsOptions = {
   credentials: true,
 }
 
-// Behind a proxy the client IP arrives in X-Forwarded-For; the rate limiter
-// needs this to key on the real caller.
-app.set('trust proxy', 1)
+// Only trust X-Forwarded-For when actually deployed behind a proxy. Trusting it
+// unconditionally lets any client spoof its own address and defeat rate limits.
+if (env.security.trustProxy) {
+  app.set('trust proxy', env.security.trustProxy)
+}
 
 // contentSecurityPolicy is left off: this API serves JSON and presigned
 // redirects, and the SPA is served separately with its own policy.
@@ -75,11 +77,36 @@ const authLimiter = rateLimit({
   message: { message: 'Too many attempts. Try again later.' },
 })
 
+/**
+ * Identifies the caller for rate-limiting. Signed-in requests are bucketed per
+ * user, so one busy tab cannot exhaust the quota for everyone sharing an office
+ * IP or NAT gateway. Anonymous requests fall back to the address.
+ */
+function rateLimitKey(req) {
+  const [, token] = (req.headers.authorization || '').split(' ')
+
+  if (token) {
+    try {
+      // Only the subject is needed, and an expired token still identifies a
+      // caller well enough to meter them; verification happens in authenticate.
+      const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString())
+      if (payload?.id) return `user:${payload.id}`
+    } catch {
+      // Malformed token: fall through to the address.
+    }
+  }
+
+  return `ip:${ipKeyGenerator(req)}`
+}
+
 const apiLimiter = rateLimit({
   windowMs,
   limit: env.security.apiRequestsPerWindow,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
+  keyGenerator: rateLimitKey,
+  // Health checks and CORS preflight are not traffic worth metering.
+  skip: (req) => req.method === 'OPTIONS' || req.path === '/health',
   message: { message: 'Too many requests. Slow down and try again.' },
 })
 

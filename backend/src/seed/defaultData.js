@@ -34,7 +34,7 @@ export const defaultPlatformConfig = {
     registrationDynamicMax: 30,
   },
   ai: {
-    model: 'moonshotai/kimi-k2-thinking',
+    model: 'openai/gpt-oss-120b',
   },
   api: {
     ai: {

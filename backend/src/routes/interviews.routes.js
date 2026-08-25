@@ -4,6 +4,7 @@ import { pool } from '../db/pool.js'
 import { authenticate } from '../middleware/auth.js'
 import { getAiRuntimeConfig } from '../services/aiSettings.js'
 import { ensureJobSchema, isCyberSecurityListing } from './jobs.routes.js'
+import { aiSystemMessage, aiTaskMessage } from '../services/aiPrompts.js'
 
 const router = Router()
 let schemaReady = false
@@ -308,11 +309,8 @@ async function generateInterviewQuestions(context, count, research, priorPrompts
       max_tokens: Math.min(12000, Math.max(2400, count * 420)),
       stream: false,
       messages: [
-        {
-          role: 'system',
-          content:
-            'Create a realistic interview practice set. Return strict JSON only: {"questions":[{"prompt":"string","competency":"string","questionType":"role|company_past","idealAnswer":"string","rubric":"string","sourceTitle":"string","sourceUrl":"string","sourceSnippet":"string"}]}. Match the supplied job description and requirements closely. Mix technical, scenario, behavioral, and communication questions. Never repeat an excluded prompt. A company_past question is allowed ONLY when a supplied web result credibly supports that question or a very close form; preserve that result title, URL, and snippet. Otherwise use questionType role and leave source fields empty. Do not claim a question was asked by a company without supporting search evidence. Ideal answers must be educational, accurate, and specific to the role.',
-        },
+        aiSystemMessage(),
+        aiTaskMessage('generateInterviewSet'),
         {
           role: 'user',
           content: JSON.stringify({
@@ -391,11 +389,8 @@ async function evaluateAnswer(question, answer, session) {
       max_tokens: 1200,
       stream: false,
       messages: [
-        {
-          role: 'system',
-          content:
-            'Evaluate one interview answer fairly and constructively. Return strict JSON only: {"score":0-100,"verdict":"Strong|Developing|Needs work","feedback":"string","strengths":["string"],"improvements":["string"]}. Compare against the ideal answer and rubric, but accept equivalent correct approaches. Reward clear reasoning, honest assumptions, and relevant experience. Give 2-4 specific improvements and concise feedback.',
-        },
+        aiSystemMessage(),
+        aiTaskMessage('gradeInterviewAnswer'),
         {
           role: 'user',
           content: JSON.stringify({

@@ -7,6 +7,7 @@ import { isRole, ROLES } from '../config/roles.js'
 import { executeCodeOnServer } from '../services/codeExecutor.js'
 import OpenAI from 'openai'
 import { getAiRuntimeConfig } from '../services/aiSettings.js'
+import { aiSystemMessage, aiTaskMessage } from '../services/aiPrompts.js'
 
 const router = Router()
 router.use(authenticate)
@@ -239,10 +240,8 @@ router.post('/ai/generate', requireTrainer, async (req, res) => {
       max_tokens: Math.min(Number(config.maxTokens) || 16000, 16000, Math.max(5000, count * (kind === 'coding' ? 2200 : 1400))),
       stream: false,
       messages: [
-        {
-          role: 'system',
-          content: 'You are a rigorous senior assessment designer. Follow the trainer brief exactly. Questions must be specific, self-contained, factually correct, and assess application rather than vague recall. Never use placeholders. Distractors must be plausible and mutually distinct. Explanations must state why the answer is correct. Return strict JSON only: {"questions":[{"questionType":"single_choice|multiple_choice|true_false|fill_blank|short_answer|long_answer|scenario|reasoning|output_prediction|bug_finding|code_analysis|security_scenario|coding","difficulty":"easy|medium|hard","prompt":"complete question or problem statement","options":["string"],"correctIndex":0,"correctAnswer":[],"explanation":"specific answer rationale","starterCode":"function solve(input) {}","solutionCode":"reference solution","settings":{"inputFormat":"string","outputFormat":"string","constraints":["string"],"examples":[{"input":"string","output":"string","explanation":"string"}]},"testCases":[{"input":"valid JSON or string","expectedOutput":"string","hidden":false,"marks":1}],"marks":1}]}. For multiple_choice, correctAnswer must contain every zero-based correct option index. For fill_blank, correctAnswer must contain accepted answer strings. Coding questions require explicit input/output, constraints, examples, reference solution, and at least 3 test cases including visible and hidden edge cases. Do not put solutions in the learner-facing prompt.',
-        },
+        aiSystemMessage(),
+        aiTaskMessage('generateAssessmentQuestions'),
         {
           role: 'user',
           content: `SUBJECT: ${subject}\nTOPIC: ${topic}\nASSESSMENT TYPE: ${kind}\nDIFFICULTY: ${difficulty}\nQUESTION COUNT: ${count}\nALLOWED QUESTION TYPES: ${allowedTypes.join(', ')}\nLEARNING OUTCOMES:\n${learningOutcomes || 'Use the trainer brief.'}\nTRAINER BRIEF:\n${brief}\n\nGenerate exactly ${count} questions. Use only the allowed types and cover the brief and learning outcomes without repeating the same concept.`,

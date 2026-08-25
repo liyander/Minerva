@@ -27,12 +27,19 @@ function GlobalSearch({ className = '' }) {
   useEffect(() => {
     const term = query.trim()
     if (term.length < 2) {
-      setResults([])
-      return undefined
+      // Clearing happens on the next tick for the same reason as below: a
+      // synchronous setState here would re-render on every keystroke.
+      const clear = window.setTimeout(() => {
+        setResults([])
+        setOpen(false)
+      }, 0)
+      return () => window.clearTimeout(clear)
     }
 
-    setBusy(true)
+    // Both state updates happen inside the debounce callback rather than during
+    // the effect body, so typing does not trigger a cascading render each keystroke.
     const timer = window.setTimeout(() => {
+      setBusy(true)
       searchPlatform(term, 6)
         .then((response) => {
           setResults(response.results)

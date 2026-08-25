@@ -14,6 +14,7 @@ import { env } from '../config/env.js'
 import { authenticate, optionalAuthenticate, requireAdmin } from '../middleware/auth.js'
 import { mapRoomRow } from '../services/roomMapper.js'
 import { getAiRuntimeConfig } from '../services/aiSettings.js'
+import { aiSystemMessage, aiTaskMessage } from '../services/aiPrompts.js'
 
 const router = Router()
 const execFileAsync = promisify(execFile)
@@ -894,11 +895,8 @@ async function generateTheoreticalQuestions(room, userId, attemptSalt = '') {
       max_tokens: Math.max(1800, Math.min(aiConfig.maxTokens, 2600)),
       stream: false,
       messages: [
-        {
-          role: 'system',
-          content:
-            'Generate assessment questions for a learning skill. Return strict JSON only: {"questions":[{"id":"string","prompt":"string","rubric":"string","sourceType":"generated|interview","company":"string","interview":"string","sourceInfo":"string","learnerVariant":"string","contentAnchorVersion":"content-anchored-v2","optional":false,"bonus":false}]}. Create exactly 5 required open-ended theoretical questions plus exactly 1 optional bonus interview question. HARD RULE: every question must be answerable using only the supplied skill content. Do not ask about tools, algorithms, technical details, historical examples, companies, interview trivia, or advanced concepts unless they are explicitly present in the skill content. Match the selected skill difficulty exactly; for Easy/basic skills, ask concept, purpose, impact, and simple application questions only. Avoid expert-level wording. The 5 required questions must use sourceType "generated", optional false, bonus false. The 1 optional bonus question must use sourceType "interview", optional true, bonus true, and must still be content-aligned. For the bonus question, include company and interview context if this resembles a known public company interview pattern; otherwise use company "General interview practice" and explain that it is interview-style practice in sourceInfo. Do not include answers.',
-        },
+        aiSystemMessage(),
+        aiTaskMessage('generateSkillQuestions'),
         {
           role: 'user',
           content: JSON.stringify({
@@ -1021,11 +1019,8 @@ async function evaluateTheoreticalAnswers(room, questions, answers) {
       max_tokens: 900,
       stream: false,
       messages: [
-        {
-          role: 'system',
-          content:
-            'Evaluate assessment answers. Return strict JSON only: {"technicalScore":0-100,"grammarScore":0-100,"bonusScore":0-10,"feedback":"string"}. Grade required questions only against the supplied skill content and question rubrics. Optional bonus interview questions must not reduce the score if blank or wrong; they may add 0-10 bonus margin only when answered and content-aligned. Be generous for beginners: if an answer captures the main skill idea, impact, and a reasonable application or example, treat it as correct even if wording is simple or not textbook-perfect. Do not penalize learners for omitting advanced material that is not in the skill content. Award 90+ when all required answers are mostly correct and content-aligned; reserve low scores for missing, unrelated, or clearly wrong answers. Technical score should be the required-question score before bonus. Grammar score evaluates clarity and professional writing but should not punish minor grammar mistakes. Feedback must mention bonus credit if an optional interview question was answered, and must end with a concise "Improve next:" section listing exactly 2-4 specific improvements.',
-        },
+        aiSystemMessage(),
+        aiTaskMessage('gradeSkillAnswers'),
         {
           role: 'user',
           content: JSON.stringify({
@@ -1127,11 +1122,8 @@ async function generateProfileAnalysis(completedRooms) {
       max_tokens: 900,
       stream: false,
       messages: [
-        {
-          role: 'system',
-          content:
-            'Analyze a learner profile. Return strict JSON only: {"suitableRole":"string","confidence":"High|Medium|Early signal","summary":"string","strengths":["string"],"improvementAreas":["string"]}. Base the recommendation only on completed skills, theoretical answers, scores, and feedback.',
-        },
+        aiSystemMessage(),
+        aiTaskMessage('analyseLearnerProfile'),
         {
           role: 'user',
           content: JSON.stringify({
@@ -1466,11 +1458,8 @@ async function matchInterviewQuestionsToRooms(questions, rooms) {
       max_tokens: Math.min(aiConfig.maxTokens, 1800),
       stream: false,
       messages: [
-        {
-          role: 'system',
-          content:
-            'Match custom interview questions to the single best skill. Return strict JSON only: {"matches":[{"questionIndex":0,"roomId":"string","reason":"short reason","company":"string","interview":"string","sourceInfo":"string","rubric":"string"}]}. Pick only from the provided skill identifiers. Prefer exact content/topic alignment. If company/interview is not provided, use "General interview practice".',
-        },
+        aiSystemMessage(),
+        aiTaskMessage('matchInterviewQuestions'),
         {
           role: 'user',
           content: JSON.stringify({
