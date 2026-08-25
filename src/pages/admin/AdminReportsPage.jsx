@@ -35,7 +35,7 @@ function formatBytes(bytes) {
 function AdminReportsPage() {
   const navigate = useNavigate()
   const session = getAuthSession()
-  const isAdmin = session && hasRole(session.role, ROLES.ADMIN)
+  const isAdmin = session && hasRole(session, ROLES.ADMIN)
   
   const [tab, setTab] = useState('exports')
   const [exports, setExports] = useState([])
