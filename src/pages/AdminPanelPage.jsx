@@ -198,27 +198,7 @@ function AdminPanelPage({ config, onConfigChange, onLogout, username }) {
                 </p>
               </a>
             </div>
-            <div className="rounded-2xl bg-surface-container-lowest shadow-soft p-6 hover:bg-surface-container-high transition-all cursor-pointer">
-              <a className="block" href="/admin/students">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <span className="material-symbols-outlined text-primary" style={{ fontSize: '32px' }}>
-                      query_stats
-                    </span>
-                    <div>
-                      <h3 className="font-headline text-lg font-bold">Student Monitor</h3>
-                      <p className="text-xs text-on-surface-variant">Individual tracking</p>
-                    </div>
-                  </div>
-                  <span className="material-symbols-outlined text-on-surface-variant">
-                    chevron_right
-                  </span>
-                </div>
-                <p className="text-sm text-on-surface-variant">
-                  Monitor each student separately, viewing their detailed statistics, progress, and performance.
-                </p>
-              </a>
-            </div>
+
             <div className="rounded-2xl bg-surface-container-lowest shadow-soft p-6 hover:bg-surface-container-high transition-all cursor-pointer">
               <a className="block" href="/admin/homepage">
                 <div className="flex items-start justify-between mb-4">
