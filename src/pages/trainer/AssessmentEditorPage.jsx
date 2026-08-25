@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import PageHeader from '../../components/PageHeader'
 import {
@@ -13,6 +13,16 @@ import {
 import { fetchQuestionBanks } from '../../services/platform'
 import { fetchClassrooms } from '../../services/community'
 
+const AI_TYPE_OPTIONS = [
+  ['single_choice', 'Single choice'], ['multiple_choice', 'Multiple choice'],
+  ['true_false', 'True / false'], ['fill_blank', 'Fill in blank'],
+  ['short_answer', 'Short answer'], ['long_answer', 'Long answer'],
+  ['scenario', 'Scenario'], ['reasoning', 'Reasoning'],
+  ['output_prediction', 'Output prediction'], ['bug_finding', 'Bug finding'],
+  ['code_analysis', 'Code analysis'], ['security_scenario', 'Security scenario'],
+  ['coding', 'Coding problem'],
+]
+
 const emptyQuestion = (kind = 'quiz') => ({
   questionType: kind === 'coding' ? 'coding' : 'single_choice',
   difficulty: 'medium',
@@ -24,6 +34,7 @@ const emptyQuestion = (kind = 'quiz') => ({
   correctAnswer: [],
   starterCode: 'function solve(input) {\n  // Return your answer\n}\n',
   solutionCode: '',
+  settings: { inputFormat: '', outputFormat: '', constraints: [], examples: [] },
   testCases: [{ input: '', expectedOutput: '', hidden: false, marks: 1 }],
 })
 
@@ -84,6 +95,13 @@ function AssessmentEditorPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [aiDraft, setAiDraft] = useState({
+    prompt: '',
+    learningOutcomes: '',
+    count: 5,
+    questionTypes: ['single_choice', 'multiple_choice', 'scenario'],
+    append: false,
+  })
 
   const load = useCallback(async () => {
     try {
@@ -136,6 +154,7 @@ function AssessmentEditorPage() {
               explanation: question.explanation || '',
               marks: question.marks ?? 1,
               correctAnswer: question.correctAnswer ?? [], starterCode: question.starterCode || '', solutionCode: question.solutionCode || '',
+              settings: question.settings || { inputFormat: '', outputFormat: '', constraints: [], examples: [] },
               testCases: question.testCases?.length ? question.testCases : [{ input: '', expectedOutput: '', hidden: false, marks: 1 }],
             }))
           : [emptyQuestion()],
@@ -172,9 +191,18 @@ function AssessmentEditorPage() {
     )
   }
 
-  const validate = () => {
+  const assessmentSummary = useMemo(() => {
+    const totalMarks = questions.reduce((sum, question) => sum + Math.max(0, Number(question.marks || 0)), 0)
+    const typeCounts = questions.reduce((counts, question) => ({ ...counts, [question.questionType]: (counts[question.questionType] || 0) + 1 }), {})
+    return { totalMarks, typeCounts }
+  }, [questions])
+
+  const validate = (publishing = false) => {
     if (!form.title.trim()) return 'Give the questionnaire a title.'
     if (!form.subject.trim()) return 'Choose a subject.'
+    if (Number(form.passPercentage) < 0 || Number(form.passPercentage) > 100) return 'Pass mark must be between 0 and 100%.'
+    if (form.opensAt && form.deadline && new Date(form.deadline) <= new Date(form.opensAt)) return 'Deadline must be after the opening time.'
+    if (form.resultsMode === 'scheduled' && !form.resultsReleaseAt) return 'Choose when scheduled results should be released.'
     if (form.targetMode === 'selected' && !form.targetUserIds.length) return 'Choose at least one trainee.'
     if (form.targetMode === 'classroom' && !form.classroomId) return 'Choose a classroom.'
 
@@ -190,21 +218,37 @@ function AssessmentEditorPage() {
 
     for (const [index, question] of questions.entries()) {
       if (!question.prompt.trim()) return `Question ${index + 1} needs a prompt.`
+      if (publishing && question.prompt.trim().length < 15) return `Question ${index + 1} is too vague. Add more detail before publishing.`
+      if (Number(question.marks) <= 0) return `Question ${index + 1} needs marks greater than zero.`
       if (['single_choice', 'multiple_choice', 'true_false', 'ordering', 'output_prediction'].includes(question.questionType)) {
         const filled = question.options.filter((option) => option.trim())
         if (filled.length < 2) return `Question ${index + 1} needs at least two options.`
+        if (new Set(filled.map((option) => option.toLowerCase())).size !== filled.length) return `Question ${index + 1} contains duplicate options.`
       }
       if (['single_choice', 'true_false', 'output_prediction'].includes(question.questionType) && !question.options[question.correctIndex]?.trim()) {
         return `Question ${index + 1} needs its correct answer filled in.`
       }
-      if (question.questionType === 'coding' && !question.testCases?.length) return `Coding question ${index + 1} needs a test case.`
+      if (question.questionType === 'multiple_choice' && !question.correctAnswer?.length) return `Question ${index + 1} needs at least one correct option.`
+      if (question.questionType === 'fill_blank' && !question.correctAnswer?.length) return `Question ${index + 1} needs at least one accepted answer.`
+      if (publishing && ['single_choice', 'multiple_choice', 'true_false', 'fill_blank', 'output_prediction'].includes(question.questionType) && !question.explanation?.trim()) return `Question ${index + 1} needs an explanation before publishing.`
+      if (question.questionType === 'coding') {
+        if (!question.starterCode?.trim()) return `Coding question ${index + 1} needs starter code.`
+        if (publishing && !question.solutionCode?.trim()) return `Coding question ${index + 1} needs a reference solution.`
+        if (publishing && !question.settings?.inputFormat?.trim()) return `Coding question ${index + 1} needs an input format.`
+        if (publishing && !question.settings?.outputFormat?.trim()) return `Coding question ${index + 1} needs an output format.`
+        if (!question.testCases?.length) return `Coding question ${index + 1} needs a test case.`
+        if (publishing && question.testCases.length < 2) return `Coding question ${index + 1} needs at least two test cases.`
+        if (publishing && !question.testCases.some((test) => !test.hidden)) return `Coding question ${index + 1} needs a visible test case.`
+        if (publishing && !question.testCases.some((test) => test.hidden)) return `Coding question ${index + 1} needs a hidden test case.`
+        if (question.testCases.some((test) => String(test.expectedOutput ?? '').trim() === '')) return `Every test case in coding question ${index + 1} needs expected output.`
+      }
     }
 
     return ''
   }
 
   const handleSave = async (publish) => {
-    const problem = validate()
+    const problem = validate(Boolean(publish))
     if (problem) {
       setError(problem)
       return
@@ -252,6 +296,42 @@ function AssessmentEditorPage() {
       }
     } catch (saveError) {
       setError(saveError?.message || 'Could not save the questionnaire.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleAiGenerate = async () => {
+    if (!form.subject.trim()) return setError('Choose a subject before using AI.')
+    if (aiDraft.prompt.trim().length < 20) return setError('Give AI a specific prompt of at least 20 characters.')
+    const questionTypes = form.kind === 'coding' ? ['coding'] : aiDraft.questionTypes
+    if (!questionTypes.length) return setError('Choose at least one question type.')
+
+    setIsSaving(true)
+    setError('')
+    setNotice('')
+    try {
+      const output = await generateAssessmentQuestions({
+        subject: form.subject,
+        topic: form.title,
+        difficulty: form.difficulty,
+        kind: form.kind,
+        count: Number(aiDraft.count),
+        prompt: aiDraft.prompt,
+        learningOutcomes: aiDraft.learningOutcomes,
+        questionTypes,
+      })
+      const generated = output.questions.map((question) => ({
+        ...emptyQuestion(form.kind),
+        ...question,
+        questionType: form.kind === 'coding' ? 'coding' : question.questionType,
+        options: form.kind === 'coding' ? [] : question.options?.length ? question.options : ['', ''],
+      }))
+      setQuestions((current) => aiDraft.append ? [...current, ...generated] : generated)
+      setForm((current) => ({ ...current, creationMethod: 'ai_edit' }))
+      setNotice(`${generated.length} focused questions generated with ${output.model || 'the configured AI model'}. Review them before publishing.`)
+    } catch (generationError) {
+      setError(generationError?.message || 'Could not generate assessment questions.')
     } finally {
       setIsSaving(false)
     }
@@ -455,11 +535,34 @@ function AssessmentEditorPage() {
           </div>
         </section>
 
+        {!form.bankId ? <section className="rounded-3xl bg-lavender p-6 text-on-lavender shadow-soft space-y-4">
+          <div>
+            <p className="font-headline text-xs font-bold uppercase tracking-wider opacity-70">AI question studio</p>
+            <h2 className="mt-1 font-headline text-xl font-extrabold">Tell AI exactly what to assess</h2>
+            <p className="mt-1 font-body text-sm opacity-80">Include concepts, scenarios, technologies, exclusions, and the level of reasoning you expect. Specific briefs produce specific questions.</p>
+          </div>
+          <label className="block">
+            <span className="font-headline text-xs font-bold">Generation prompt *</span>
+            <textarea className="mt-1.5 min-h-32 w-full rounded-2xl border border-transparent bg-surface-container-lowest px-4 py-3 font-body text-sm text-on-surface outline-none focus:border-primary" onChange={(event)=>setAiDraft((current)=>({...current,prompt:event.target.value}))} placeholder="Example: Create scenario-based questions where learners analyze authentication logs, identify password-spraying indicators, choose the correct containment action, and explain why. Use realistic Windows event IDs. Do not ask definition-only questions." value={aiDraft.prompt}/>
+            <span className={`mt-1 block text-xs ${aiDraft.prompt.trim().length < 20 ? 'text-error' : 'opacity-70'}`}>{aiDraft.prompt.trim().length}/20 minimum characters</span>
+          </label>
+          <label className="block">
+            <span className="font-headline text-xs font-bold">Learning outcomes</span>
+            <textarea className="mt-1.5 min-h-20 w-full rounded-2xl border border-transparent bg-surface-container-lowest px-4 py-3 font-body text-sm text-on-surface outline-none focus:border-primary" onChange={(event)=>setAiDraft((current)=>({...current,learningOutcomes:event.target.value}))} placeholder="One outcome per line, e.g. Distinguish brute force from password spraying" value={aiDraft.learningOutcomes}/>
+          </label>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-[10rem_1fr]">
+            <label><span className="font-headline text-xs font-bold">Question count</span><input className="mt-1.5 w-full rounded-xl bg-surface-container-lowest px-3 py-2.5 text-on-surface" max="20" min="1" onChange={(event)=>setAiDraft((current)=>({...current,count:Number(event.target.value)}))} type="number" value={aiDraft.count}/></label>
+            <div><span className="font-headline text-xs font-bold">Question mix</span><div className="mt-2 flex flex-wrap gap-2">{AI_TYPE_OPTIONS.filter(([type])=>form.kind==='coding'?type==='coding':form.kind==='quiz'?type!=='coding':true).map(([type,label])=><label className={`rounded-full px-3 py-1.5 text-xs font-bold ${((form.kind==='coding'&&type==='coding')||aiDraft.questionTypes.includes(type))?'bg-primary text-on-primary':'bg-surface-container-lowest text-on-surface'}`} key={type}><input checked={(form.kind==='coding'&&type==='coding')||aiDraft.questionTypes.includes(type)} className="sr-only" disabled={form.kind==='coding'} onChange={(event)=>setAiDraft((current)=>({...current,questionTypes:event.target.checked?[...current.questionTypes,type]:current.questionTypes.filter((value)=>value!==type)}))} type="checkbox"/>{label}</label>)}</div></div>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <label className="flex items-center gap-2 text-sm"><input checked={aiDraft.append} onChange={(event)=>setAiDraft((current)=>({...current,append:event.target.checked}))} type="checkbox"/>Append to existing questions</label>
+            <button className={`${pill} bg-primary text-on-primary disabled:opacity-50`} disabled={isSaving||aiDraft.prompt.trim().length<20} onClick={handleAiGenerate} type="button"><span className="material-symbols-outlined mr-1 align-middle text-base">auto_awesome</span>{isSaving?'Generating…':'Generate focused questions'}</button>
+          </div>
+        </section> : null}
+
         {!form.bankId ? <section className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-headline text-lg font-extrabold text-on-background">
-              Questions ({questions.length})
-            </h2>
+            <div><h2 className="font-headline text-lg font-extrabold text-on-background">Questions ({questions.length})</h2><p className="mt-1 text-xs text-on-surface-variant">{assessmentSummary.totalMarks} total marks · {Object.entries(assessmentSummary.typeCounts).map(([type,count])=>`${count} ${type.replaceAll('_',' ')}`).join(' · ')}</p></div>
             <button
               className={`${pill} bg-surface-container-high text-on-surface`}
               onClick={() => setQuestions((current) => [...current, emptyQuestion(form.kind)])}
@@ -467,7 +570,6 @@ function AssessmentEditorPage() {
             >
               Add question
             </button>
-            <button className={`${pill} bg-lavender text-on-lavender`} onClick={async()=>{if(!form.subject){setError('Choose a subject before using AI.');return}setIsSaving(true);setError('');try{const output=await generateAssessmentQuestions({subject:form.subject,topic:form.title,difficulty:form.difficulty,kind:form.kind,count:5});setQuestions(output.questions.map((question)=>({...emptyQuestion(form.kind),...question,questionType:form.kind==='coding'?'coding':question.questionType,options:form.kind==='coding'?[]:question.options?.length?question.options:['','']})));setForm((current)=>({...current,creationMethod:'ai_edit'}));setNotice(output.generatedBy==='ai'?'AI draft generated. Review every answer before publishing.':'Draft templates generated because no AI provider was available.')}catch(e){setError(e.message)}finally{setIsSaving(false)}}} type="button">Generate with AI</button>
           </div>
 
           {questions.map((question, index) => (
@@ -476,18 +578,12 @@ function AssessmentEditorPage() {
                 <span className="rounded-full bg-primary-container text-on-primary-container px-3 py-1 font-headline text-xs font-bold shrink-0">
                   Q{index + 1}
                 </span>
-                {questions.length > 1 ? (
-                  <button
-                    aria-label="Remove question"
-                    className="text-on-surface-variant hover:text-error transition-colors"
-                    onClick={() =>
-                      setQuestions((current) => current.filter((_, position) => position !== index))
-                    }
-                    type="button"
-                  >
-                    <span className="material-symbols-outlined text-base">delete</span>
-                  </button>
-                ) : null}
+                <div className="flex items-center gap-1">
+                  <button aria-label="Move question up" className="rounded-full p-1.5 text-on-surface-variant disabled:opacity-30" disabled={index===0} onClick={()=>setQuestions((current)=>{const copy=[...current];[copy[index-1],copy[index]]=[copy[index],copy[index-1]];return copy})} type="button"><span className="material-symbols-outlined text-base">arrow_upward</span></button>
+                  <button aria-label="Move question down" className="rounded-full p-1.5 text-on-surface-variant disabled:opacity-30" disabled={index===questions.length-1} onClick={()=>setQuestions((current)=>{const copy=[...current];[copy[index],copy[index+1]]=[copy[index+1],copy[index]];return copy})} type="button"><span className="material-symbols-outlined text-base">arrow_downward</span></button>
+                  <button aria-label="Duplicate question" className="rounded-full p-1.5 text-on-surface-variant" onClick={()=>setQuestions((current)=>[...current.slice(0,index+1),{...question,options:[...question.options],correctAnswer:[...(question.correctAnswer||[])],testCases:(question.testCases||[]).map((test)=>({...test})),settings:{...(question.settings||{})}},...current.slice(index+1)])} type="button"><span className="material-symbols-outlined text-base">content_copy</span></button>
+                  {questions.length > 1 ? <button aria-label="Remove question" className="rounded-full p-1.5 text-on-surface-variant hover:text-error" onClick={()=>setQuestions((current)=>current.filter((_,position)=>position!==index))} type="button"><span className="material-symbols-outlined text-base">delete</span></button> : null}
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -568,7 +664,12 @@ function AssessmentEditorPage() {
 
               {['fill_blank','short_answer'].includes(question.questionType)?<label className="block"><span className="font-headline text-xs font-bold text-on-surface-variant">Accepted answers (one per line; optional for manual short-answer grading)</span><textarea className={fieldClass} onChange={(e)=>updateQuestion(index,{correctAnswer:e.target.value.split('\n').filter(Boolean)})} rows={3} value={(question.correctAnswer||[]).join('\n')}/></label>:null}
 
-              {question.questionType==='coding'?<div className="space-y-4"><label className="block"><span className="font-headline text-xs font-bold text-on-surface-variant">Starter code</span><textarea className={`${fieldClass} font-mono`} onChange={(e)=>updateQuestion(index,{starterCode:e.target.value})} rows={7} value={question.starterCode}/></label><div><div className="flex justify-between"><span className="font-headline text-xs font-bold">Visible and hidden test cases</span><button className="text-xs font-bold text-primary" onClick={()=>updateQuestion(index,{testCases:[...(question.testCases||[]),{input:'',expectedOutput:'',hidden:true,marks:1}]})} type="button">+ Test case</button></div>{(question.testCases||[]).map((test,testIndex)=><div className="mt-2 grid grid-cols-[1fr_1fr_auto_auto] gap-2" key={testIndex}><input className={fieldClass} onChange={(e)=>updateQuestion(index,{testCases:question.testCases.map((t,j)=>j===testIndex?{...t,input:e.target.value}:t)})} placeholder="Input (JSON supported)" value={test.input}/><input className={fieldClass} onChange={(e)=>updateQuestion(index,{testCases:question.testCases.map((t,j)=>j===testIndex?{...t,expectedOutput:e.target.value}:t)})} placeholder="Expected output" value={test.expectedOutput}/><label className="flex items-center gap-1 text-xs"><input checked={test.hidden} onChange={(e)=>updateQuestion(index,{testCases:question.testCases.map((t,j)=>j===testIndex?{...t,hidden:e.target.checked}:t)})} type="checkbox"/>Hidden</label><button onClick={()=>updateQuestion(index,{testCases:question.testCases.filter((_,j)=>j!==testIndex)})} type="button">×</button></div>)}</div></div>:null}
+              {question.questionType==='coding'?<div className="space-y-4 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><label><span className="font-headline text-xs font-bold text-on-surface-variant">Input format</span><input className={fieldClass} onChange={(e)=>updateQuestion(index,{settings:{...(question.settings||{}),inputFormat:e.target.value}})} placeholder="e.g. JSON array of integers" value={question.settings?.inputFormat||''}/></label><label><span className="font-headline text-xs font-bold text-on-surface-variant">Output format</span><input className={fieldClass} onChange={(e)=>updateQuestion(index,{settings:{...(question.settings||{}),outputFormat:e.target.value}})} placeholder="e.g. Return an integer" value={question.settings?.outputFormat||''}/></label></div>
+                <label className="block"><span className="font-headline text-xs font-bold text-on-surface-variant">Constraints (one per line)</span><textarea className={fieldClass} onChange={(e)=>updateQuestion(index,{settings:{...(question.settings||{}),constraints:e.target.value.split('\n').filter(Boolean)}})} rows={3} value={(question.settings?.constraints||[]).join('\n')}/></label>
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2"><label className="block"><span className="font-headline text-xs font-bold text-on-surface-variant">Starter code</span><textarea className={`${fieldClass} font-mono`} onChange={(e)=>updateQuestion(index,{starterCode:e.target.value})} rows={8} value={question.starterCode}/></label><label className="block"><span className="font-headline text-xs font-bold text-on-surface-variant">Reference solution (trainer only)</span><textarea className={`${fieldClass} font-mono`} onChange={(e)=>updateQuestion(index,{solutionCode:e.target.value})} rows={8} value={question.solutionCode}/></label></div>
+                <div><div className="flex justify-between"><span className="font-headline text-xs font-bold">Visible and hidden test cases</span><button className="text-xs font-bold text-primary" onClick={()=>updateQuestion(index,{testCases:[...(question.testCases||[]),{input:'',expectedOutput:'',hidden:true,marks:1}]})} type="button">+ Test case</button></div>{(question.testCases||[]).map((test,testIndex)=><div className="mt-2 grid grid-cols-1 gap-2 rounded-xl bg-surface-container p-3 sm:grid-cols-[1fr_1fr_5rem_auto_auto]" key={testIndex}><input className={fieldClass} onChange={(e)=>updateQuestion(index,{testCases:question.testCases.map((t,j)=>j===testIndex?{...t,input:e.target.value}:t)})} placeholder="Input (JSON supported)" value={test.input}/><input className={fieldClass} onChange={(e)=>updateQuestion(index,{testCases:question.testCases.map((t,j)=>j===testIndex?{...t,expectedOutput:e.target.value}:t)})} placeholder="Expected output" value={test.expectedOutput}/><input className={fieldClass} min="1" onChange={(e)=>updateQuestion(index,{testCases:question.testCases.map((t,j)=>j===testIndex?{...t,marks:Number(e.target.value)}:t)})} title="Marks" type="number" value={test.marks}/><label className="flex items-center gap-1 text-xs"><input checked={test.hidden} onChange={(e)=>updateQuestion(index,{testCases:question.testCases.map((t,j)=>j===testIndex?{...t,hidden:e.target.checked}:t)})} type="checkbox"/>Hidden</label><button aria-label="Remove test case" className="text-error" onClick={()=>updateQuestion(index,{testCases:question.testCases.filter((_,j)=>j!==testIndex)})} type="button">×</button></div>)}</div>
+              </div>:null}
 
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <label className="block sm:col-span-3">

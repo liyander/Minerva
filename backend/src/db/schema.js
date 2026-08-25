@@ -20,6 +20,7 @@ import {
   CONTEST_TABLE_DDL,
   CONTEST_TABLES,
 } from './contestSchema.js'
+import { REPORTING_TABLE_DDL, REPORTING_TABLES } from './reportingSchema.js'
 
 // Single source of truth for the database shape. Both the CLI initialiser and
 // the admin "Database" screen build the schema from here, so they can never
@@ -552,7 +553,7 @@ const COLUMN_MIGRATIONS = [
   ['community_messages', 'attachment_type', 'VARCHAR(120) NULL'],
   ['community_messages', 'attachment_size', 'INT DEFAULT 0'],
   ['community_messages', 'attachment_data', 'LONGTEXT NULL'],
-  ['community_channels', 'scope_classroom_id', 'BIGINT GENERATED ALWAYS AS (IFNULL(classroom_id, 0)) STORED'],
+  ['community_channels', 'scope_classroom_id', 'BIGINT GENERATED ALWAYS AS (IFNULL(classroom_id, 0)) VIRTUAL'],
 ]
 
 async function addColumnIfMissing(conn, tableName, columnName, definitionSql) {
@@ -642,6 +643,8 @@ export async function createCoreTables(conn) {
   await conn.query(EXPERIENCE_TABLE_DDL)
   // Contest and Live Quiz tables
   await conn.query(CONTEST_TABLE_DDL)
+  // Background reporting jobs
+  await conn.query(REPORTING_TABLE_DDL)
   return (
     CORE_TABLES.length
     + TRAINING_TABLES.length
@@ -649,8 +652,10 @@ export async function createCoreTables(conn) {
     + PLATFORM_TABLES.length
     + EXPERIENCE_TABLES.length
     + CONTEST_TABLES.length
+    + REPORTING_TABLES.length
   )
 }
+
 
 export async function applyColumnMigrations(conn) {
   const applied = []

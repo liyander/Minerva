@@ -5,6 +5,7 @@ import { setupRoomTerminalWebSocket } from './routes/rooms.routes.js'
 import { setupCommunityWebSocket } from './routes/community.routes.js'
 import { setupContestWebSocket } from './routes/contests.routes.js'
 import { startReminderSchedule } from './services/reminders.js'
+import './services/reportWorker.js'
 
 async function start() {
   try {

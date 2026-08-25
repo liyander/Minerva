@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import PageHeader from '../../components/PageHeader'
 import { apiFetch } from '../../services/api'
+import { defaultCourses } from '../../data/coursesData'
 
 // Simple CSS Bar Chart for XP by Category
 function CategoryXpChart({ completedRooms }) {
@@ -85,6 +86,204 @@ function RecentScoresChart({ rooms }) {
             </span>
           </div>
         ))}
+      </div>
+    </div>
+  )
+}
+
+function RadarChart({ rooms }) {
+  const categoryScores = {};
+  const categoryCounts = {};
+  
+  (rooms || []).forEach(room => {
+    if (room.status === 'completed' && room.technicalScore !== null) {
+       categoryScores[room.category] = (categoryScores[room.category] || 0) + room.technicalScore;
+       categoryCounts[room.category] = (categoryCounts[room.category] || 0) + 1;
+    }
+  });
+  
+  const avgScores = {};
+  Object.keys(categoryScores).forEach(cat => {
+    avgScores[cat] = categoryScores[cat] / categoryCounts[cat];
+  });
+  
+  const categories = Object.keys(avgScores);
+  if (categories.length < 3) {
+    return <p className="text-sm text-on-surface-variant text-center mt-6">Need at least 3 distinct categories with scores for radar chart.</p>
+  }
+  
+  const size = 200;
+  const center = size / 2;
+  const radius = (size / 2) - 30; // padding for labels
+  
+  const points = categories.map((cat, i) => {
+    const angle = (Math.PI * 2 * i) / categories.length;
+    const score = avgScores[cat];
+    const x = center + radius * (score / 100) * Math.sin(angle);
+    const y = center - radius * (score / 100) * Math.cos(angle);
+    return `${x},${y}`;
+  }).join(' ');
+
+  const webPoints = [20, 40, 60, 80, 100].map(level => {
+    return categories.map((_, i) => {
+      const angle = (Math.PI * 2 * i) / categories.length;
+      const x = center + radius * (level / 100) * Math.sin(angle);
+      const y = center - radius * (level / 100) * Math.cos(angle);
+      return `${x},${y}`;
+    }).join(' ');
+  });
+
+  return (
+    <div className="flex justify-center items-center mt-6 relative w-full h-[200px]">
+      <svg width="100%" height="100%" viewBox={`0 0 ${size} ${size}`} className="overflow-visible">
+        {webPoints.map((pts, i) => (
+          <polygon key={i} points={pts} fill="none" stroke="currentColor" className="text-outline-variant/30" strokeWidth="1" />
+        ))}
+        {categories.map((_, i) => {
+           const angle = (Math.PI * 2 * i) / categories.length;
+           const x = center + radius * Math.sin(angle);
+           const y = center - radius * Math.cos(angle);
+           return <line key={i} x1={center} y1={center} x2={x} y2={y} stroke="currentColor" className="text-outline-variant/30" strokeWidth="1" />
+        })}
+        <polygon points={points} fill="currentColor" className="text-primary" stroke="currentColor" strokeWidth="2" fillOpacity="0.25" />
+        {categories.map((cat, i) => {
+           const angle = (Math.PI * 2 * i) / categories.length;
+           const score = avgScores[cat];
+           const px = center + radius * (score / 100) * Math.sin(angle);
+           const py = center - radius * (score / 100) * Math.cos(angle);
+           const lx = center + (radius + 20) * Math.sin(angle);
+           const ly = center - (radius + 15) * Math.cos(angle);
+           
+           return (
+             <g key={cat}>
+               <circle cx={px} cy={py} r="3" fill="currentColor" className="text-primary" />
+               <text x={lx} y={ly} textAnchor="middle" alignmentBaseline="middle" className="text-[8px] font-bold fill-on-surface-variant" fill="currentColor">{cat.substring(0,10)}</text>
+             </g>
+           )
+        })}
+      </svg>
+    </div>
+  )
+}
+
+function TimelineChart({ rooms }) {
+  const scoredRooms = rooms?.filter(r => r.status === 'completed' && r.technicalScore !== null)
+    .sort((a, b) => new Date(a.completedAt) - new Date(b.completedAt)) || [];
+    
+  if (scoredRooms.length < 2) {
+    return <p className="text-sm text-on-surface-variant text-center mt-6">Not enough data for timeline progression.</p>
+  }
+
+  const width = 350;
+  const height = 160;
+  const paddingX = 35;
+  const paddingY = 30;
+  
+  const minScore = 0;
+  const maxScore = 100;
+  
+  const points = scoredRooms.map((room, i) => {
+    const x = paddingX + (i / (scoredRooms.length - 1)) * (width - 2 * paddingX);
+    const y = height - paddingY - ((room.technicalScore - minScore) / (maxScore - minScore)) * (height - 2 * paddingY);
+    return `${x},${y}`;
+  }).join(' ');
+
+  return (
+    <div className="mt-6 flex flex-col w-full h-[220px] overflow-x-auto">
+      <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="overflow-visible min-w-[300px]">
+        {[0, 25, 50, 75, 100].map(score => {
+          const y = height - paddingY - (score / 100) * (height - 2 * paddingY);
+          return (
+             <g key={score}>
+               <line x1={paddingX} y1={y} x2={width-paddingX} y2={y} stroke="currentColor" className="text-outline-variant/20" strokeWidth="1" strokeDasharray="2" />
+               <text x={paddingX - 5} y={y} textAnchor="end" alignmentBaseline="middle" className="text-[8px] fill-on-surface-variant">{score}</text>
+             </g>
+          )
+        })}
+        <polyline points={points} fill="none" stroke="currentColor" className="text-primary" strokeWidth="2" />
+        {scoredRooms.map((room, i) => {
+          const x = paddingX + (i / (scoredRooms.length - 1)) * (width - 2 * paddingX);
+          const y = height - paddingY - ((room.technicalScore - minScore) / (maxScore - minScore)) * (height - 2 * paddingY);
+          return (
+             <g key={i}>
+               <circle cx={x} cy={y} r="4" fill="currentColor" className="text-surface" stroke="currentColor" strokeWidth="2" />
+               <circle cx={x} cy={y} r="4" fill="transparent" className="text-primary" stroke="currentColor" strokeWidth="2" />
+               <text x={x} y={height - paddingY + 12} textAnchor="middle" className="text-[8px] fill-on-surface-variant">{new Date(room.completedAt).toLocaleDateString([], {month:'short', day:'numeric'})}</text>
+             </g>
+          )
+        })}
+      </svg>
+    </div>
+  )
+}
+
+function SkillGapAnalysis({ roomActivity, defaultCourses }) {
+  const categoryScores = {};
+  const categoryCounts = {};
+  
+  if (!roomActivity?.rooms) return null;
+  
+  roomActivity.rooms.forEach(room => {
+    if (room.status === 'completed' && room.technicalScore !== null) {
+       categoryScores[room.category] = (categoryScores[room.category] || 0) + room.technicalScore;
+       categoryCounts[room.category] = (categoryCounts[room.category] || 0) + 1;
+    }
+  });
+  
+  const weakCategories = Object.keys(categoryScores)
+    .map(cat => ({ category: cat, avgScore: categoryScores[cat] / categoryCounts[cat] }))
+    .filter(cat => cat.avgScore < 75)
+    .sort((a, b) => a.avgScore - b.avgScore);
+    
+  if (weakCategories.length === 0) {
+    return (
+      <div className="rounded-3xl bg-mint/10 p-6 border border-mint/20 mt-6">
+        <h3 className="font-headline text-lg font-bold text-mint flex items-center gap-2">
+          <span className="material-symbols-outlined">verified</span>
+          No Major Weaknesses Detected
+        </h3>
+        <p className="text-sm text-on-surface mt-2">The student is performing well (≥ 75%) across all attempted categories.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft mt-6">
+      <h3 className="font-headline text-lg font-bold text-on-background flex items-center gap-2 mb-4">
+        <span className="material-symbols-outlined text-blush">warning</span>
+        Skill Gap Analysis & Recommendations
+      </h3>
+      <p className="text-sm text-on-surface-variant mb-6">We identified areas where the student's average technical score is below 75%. Here are some recommended courses to help them upskill.</p>
+      
+      <div className="space-y-6">
+        {weakCategories.map(weak => {
+           const recommendations = defaultCourses.filter(c => c.category === weak.category || c.tags?.includes(weak.category)).slice(0, 2);
+           
+           return (
+             <div key={weak.category} className="bg-surface p-5 rounded-2xl border border-blush/20">
+               <div className="flex justify-between items-center mb-4">
+                 <h4 className="font-headline text-base font-bold text-on-background">{weak.category}</h4>
+                 <span className="bg-blush/20 text-blush px-3 py-1 rounded-full text-xs font-bold">Avg Score: {Math.round(weak.avgScore)}%</span>
+               </div>
+               
+               {recommendations.length > 0 ? (
+                 <div>
+                   <p className="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-3">Recommended Courses</p>
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                     {recommendations.map(rec => (
+                       <a key={rec.id} href={`/courses/${rec.slug}`} className="flex flex-col gap-1 p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/20 hover:border-primary transition-colors">
+                         <span className="font-bold text-sm text-on-background truncate">{rec.title}</span>
+                         <span className="text-xs text-on-surface-variant truncate">{rec.description}</span>
+                       </a>
+                     ))}
+                   </div>
+                 </div>
+               ) : (
+                 <p className="text-sm text-on-surface-variant italic">No specific courses found for this category.</p>
+               )}
+             </div>
+           )
+        })}
       </div>
     </div>
   )
@@ -305,11 +504,27 @@ function AdminStudentStatsPage() {
                   <div className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft">
                     <h3 className="font-headline text-lg font-bold text-on-background flex items-center gap-2">
                       <span className="material-symbols-outlined text-primary">ssid_chart</span>
-                      Performance
+                      Recent Scores
                     </h3>
                     <RecentScoresChart rooms={roomActivity?.rooms} />
                   </div>
+                  <div className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft">
+                    <h3 className="font-headline text-lg font-bold text-on-background flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary">radar</span>
+                      Strength Radar
+                    </h3>
+                    <RadarChart rooms={roomActivity?.rooms} />
+                  </div>
+                  <div className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft">
+                    <h3 className="font-headline text-lg font-bold text-on-background flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary">timeline</span>
+                      Score Progression
+                    </h3>
+                    <TimelineChart rooms={roomActivity?.rooms} />
+                  </div>
                 </div>
+
+                <SkillGapAnalysis roomActivity={roomActivity} defaultCourses={defaultCourses} />
               </div>
             )}
 

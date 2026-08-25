@@ -29,7 +29,7 @@ export const COMMUNITY_TABLE_DDL = `
   CREATE TABLE IF NOT EXISTS community_channels (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     classroom_id BIGINT NULL,
-    scope_classroom_id BIGINT GENERATED ALWAYS AS (IFNULL(classroom_id, 0)) STORED,
+    scope_classroom_id BIGINT GENERATED ALWAYS AS (IFNULL(classroom_id, 0)) VIRTUAL,
     name VARCHAR(80) NOT NULL,
     topic VARCHAR(255),
     kind VARCHAR(20) NOT NULL DEFAULT 'general',

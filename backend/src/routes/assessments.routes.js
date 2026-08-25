@@ -7,6 +7,7 @@ import { isRole, ROLES } from '../config/roles.js'
 import { executeCodeOnServer } from '../services/codeExecutor.js'
 import OpenAI from 'openai'
 import { getAiRuntimeConfig } from '../services/aiSettings.js'
+import { aiSystemMessage, aiTaskMessage } from '../services/aiPrompts.js'
 
 const router = Router()
 router.use(authenticate)
@@ -110,36 +111,177 @@ router.get('/target-users', requireTrainer, async (req, res) => {
   const params = []; const join = req.query.classroomId ? (params.push(Number(req.query.classroomId)), 'JOIN classroom_members cm ON cm.user_id=u.id AND cm.classroom_id=?') : ''
   const [rows] = await pool.query(`SELECT DISTINCT u.id,u.username,u.first_name,u.last_name,u.email FROM users u ${join} WHERE u.is_active=true AND u.role IN ('trainee','student','operator') ORDER BY u.first_name,u.username LIMIT 500`, params); res.json(rows)
 })
+
+const AI_QUESTION_TYPES = new Set([
+  'single_choice', 'multiple_choice', 'true_false', 'fill_blank', 'short_answer',
+  'long_answer', 'scenario', 'reasoning', 'output_prediction', 'bug_finding',
+  'code_analysis', 'security_scenario', 'coding',
+])
+
+const AI_QUESTION_TYPE_ALIASES = {
+  mcq: 'single_choice',
+  singlechoice: 'single_choice',
+  multiplechoice: 'multiple_choice',
+  truefalse: 'true_false',
+  fillblank: 'fill_blank',
+  shortanswer: 'short_answer',
+  longanswer: 'long_answer',
+  outputprediction: 'output_prediction',
+  bugfinding: 'bug_finding',
+  codeanalysis: 'code_analysis',
+  securityscenario: 'security_scenario',
+  codingquestion: 'coding',
+}
+
+function normalizeAiQuestionType(value) {
+  const normalized = String(value || '').trim().replace(/([a-z])([A-Z])/g, '$1_$2').replace(/[\s-]+/g, '_').toLowerCase()
+  if (AI_QUESTION_TYPES.has(normalized)) return normalized
+  return AI_QUESTION_TYPE_ALIASES[normalized.replaceAll('_', '')] || ''
+}
+
+function parseAiJson(message) {
+  const content = Array.isArray(message?.content)
+    ? message.content.map((part) => part?.text || part?.content || '').join('')
+    : String(message?.content || '')
+  const candidates = [content, String(message?.reasoning_content || '')].filter(Boolean)
+  for (const candidate of candidates) {
+    const cleaned = candidate
+      .replace(/<think>[\s\S]*?<\/think>/gi, '')
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .trim()
+    const objectStart = cleaned.indexOf('{')
+    const objectEnd = cleaned.lastIndexOf('}')
+    for (const value of [cleaned, objectStart >= 0 && objectEnd > objectStart ? cleaned.slice(objectStart, objectEnd + 1) : '']) {
+      if (!value) continue
+      try { return JSON.parse(value) } catch { /* Try the next representation. */ }
+    }
+  }
+  throw new Error('AI response did not contain a complete JSON object')
+}
+
+function normalizeGeneratedQuestion(question, kind, difficulty) {
+  const requestedType = normalizeAiQuestionType(question?.questionType || question?.type) || 'single_choice'
+  const questionType = kind === 'coding' ? 'coding' : kind === 'quiz' && requestedType === 'coding' ? 'scenario' : requestedType
+  const options = Array.isArray(question?.options)
+    ? question.options.map((option) => String(option || '').trim()).filter(Boolean)
+    : []
+  const tests = Array.isArray(question?.testCases)
+    ? question.testCases.map((test, index) => ({
+        input: String(test?.input ?? ''),
+        expectedOutput: String(test?.expectedOutput ?? ''),
+        hidden: index > 0 ? test?.hidden !== false : false,
+        marks: Math.max(1, Number(test?.marks || 1)),
+      }))
+    : []
+
+  return {
+    questionType,
+    difficulty: ['easy', 'medium', 'hard'].includes(question?.difficulty) ? question.difficulty : difficulty,
+    prompt: String(question?.prompt || '').trim(),
+    options: questionType === 'coding' ? [] : options,
+    correctIndex: Math.max(0, Number(question?.correctIndex || 0)),
+    correctAnswer: Array.isArray(question?.correctAnswer) ? question.correctAnswer : [],
+    explanation: String(question?.explanation || '').trim(),
+    starterCode: questionType === 'coding'
+      ? String(question?.starterCode || 'function solve(input) {\n  // Return your answer\n}\n')
+      : '',
+    solutionCode: questionType === 'coding' ? String(question?.solutionCode || '') : '',
+    settings: question?.settings && typeof question.settings === 'object' ? question.settings : {},
+    testCases: questionType === 'coding' ? tests : [],
+    marks: Math.max(1, Number(question?.marks || (questionType === 'coding' ? 10 : 1))),
+  }
+}
+
+function generatedQuestionIsUsable(question) {
+  if (question.prompt.length < 25 || /generated practice question|option a|edit this/i.test(question.prompt)) return false
+  if (['single_choice', 'multiple_choice', 'true_false', 'output_prediction'].includes(question.questionType)) {
+    if (question.options.length < 2 || new Set(question.options.map((value) => value.toLowerCase())).size !== question.options.length) return false
+    if (question.explanation.length < 12) return false
+  }
+  if (['single_choice', 'true_false', 'output_prediction'].includes(question.questionType) && question.correctIndex >= question.options.length) return false
+  if (question.questionType === 'multiple_choice' && !question.correctAnswer.length) return false
+  if (question.questionType === 'fill_blank' && !question.correctAnswer.length) return false
+  if (question.questionType === 'coding') {
+    if (question.prompt.length < 60 || question.testCases.length < 2) return false
+    if (!question.settings?.inputFormat || !question.settings?.outputFormat || question.solutionCode.length < 20) return false
+    if (!question.testCases.some((test) => !test.hidden) || !question.testCases.some((test) => test.hidden)) return false
+    if (question.testCases.some((test) => !test.expectedOutput)) return false
+  }
+  return true
+}
+
 router.post('/ai/generate', requireTrainer, async (req, res) => {
   const subject = String(req.body?.subject || '').trim(), topic = String(req.body?.topic || subject).trim()
   const count = Math.min(20, Math.max(1, Number(req.body?.count || 5))), difficulty = String(req.body?.difficulty || 'medium')
   const kind = ['quiz', 'coding', 'combined'].includes(req.body?.kind) ? req.body.kind : 'quiz'
+  const brief = String(req.body?.prompt || '').trim()
+  const learningOutcomes = String(req.body?.learningOutcomes || '').trim()
+  const requestedTypes = [...new Set((Array.isArray(req.body?.questionTypes) ? req.body.questionTypes : [])
+    .filter((type) => AI_QUESTION_TYPES.has(type)))]
   if (!subject) return res.status(400).json({ message: 'Choose a subject before generating questions' })
-  const codingFallback = (index) => ({ questionType: 'coding', difficulty,
-    prompt: `${topic}: implement solve(input) for coding problem ${index + 1}. Edit the statement, constraints, and tests before publishing.`,
-    options: [], starterCode: 'function solve(input) {\n  // Return your answer\n}\n', solutionCode: '', marks: 10,
-    settings: { inputFormat: 'JSON value', outputFormat: 'Return value', constraints: [] },
-    testCases: [{ input: '1', expectedOutput: '1', hidden: false, marks: 4 }, { input: '2', expectedOutput: '2', hidden: true, marks: 6 }] })
-  const quizFallback = (index) => ({ questionType: 'single_choice', difficulty,
-    prompt: `${topic}: generated practice question ${index + 1}`, options: ['Option A', 'Option B', 'Option C', 'Option D'],
-    correctIndex: 0, explanation: 'Edit this generated draft and confirm the correct answer.', marks: 1 })
-  const fallback = Array.from({ length: count }, (_, index) => kind === 'coding' ? codingFallback(index) : quizFallback(index))
+  if (brief.length < 20) return res.status(400).json({ message: 'Give AI a specific prompt of at least 20 characters' })
+
+  const allowedTypes = kind === 'coding'
+    ? ['coding']
+    : kind === 'quiz'
+      ? (requestedTypes.length ? requestedTypes.filter((type) => type !== 'coding') : ['single_choice', 'multiple_choice', 'true_false', 'fill_blank'])
+      : (requestedTypes.length ? requestedTypes : ['single_choice', 'scenario', 'coding'])
+  if (!allowedTypes.length) return res.status(400).json({ message: 'Choose at least one question type suitable for this assessment' })
+
   const config = await getAiRuntimeConfig()
-  if (!config.apiKey) return res.json({ questions: fallback, generatedBy: 'template' })
+  if (!config.apiKey) return res.status(503).json({ message: 'AI generation is not configured. Add an AI API key in Platform Configuration.' })
   try {
     const client = new OpenAI({ baseURL: config.baseUrl, apiKey: config.apiKey })
-    const response = await client.chat.completions.create({ model: config.model, temperature: Number(config.temperature || 0.5), max_tokens: Math.min(10000, count * 700), stream: false,
-      messages: [{ role: 'system', content: 'Return strict JSON only: {"questions":[{"questionType":"single_choice|multiple_choice|true_false|fill_blank|short_answer|long_answer|scenario|reasoning|output_prediction|bug_finding|code_analysis|security_scenario|coding","difficulty":"easy|medium|hard","prompt":"complete problem statement","options":["string"],"correctIndex":0,"correctAnswer":[],"explanation":"string","starterCode":"function solve(input) {}","solutionCode":"string","settings":{"inputFormat":"string","outputFormat":"string","constraints":["string"]},"testCases":[{"input":"valid JSON or string","expectedOutput":"string","hidden":false,"marks":1}],"marks":1}]}. For coding questions include at least two valid test cases, one hidden, and no answer options. Multiple-choice correctAnswer contains zero-based indexes. Fill-blank correctAnswer contains accepted strings.' },
-        { role: 'user', content: `Create ${count} ${difficulty} ${kind} assessment questions for subject ${subject}, topic ${topic}. ${kind === 'coding' ? 'Every question must have questionType coding.' : kind === 'quiz' ? 'Do not create coding questions.' : 'Mix objective, descriptive, and coding questions.'}` }] })
-    const raw = String(response.choices?.[0]?.message?.content || '').replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim()
-    const parsed = JSON.parse(raw), generated = Array.isArray(parsed.questions) ? parsed.questions.slice(0, count) : []
-    const questions = generated.map((question, index) => {
-      if (kind !== 'coding') return question
-      return { ...codingFallback(index), ...question, questionType: 'coding', options: [],
-        testCases: Array.isArray(question.testCases) && question.testCases.length ? question.testCases : codingFallback(index).testCases }
+    const response = await client.chat.completions.create({
+      model: config.model,
+      temperature: Math.min(0.7, Number(config.temperature || 0.45)),
+      top_p: config.topP,
+      max_tokens: Math.min(Number(config.maxTokens) || 16000, 16000, Math.max(5000, count * (kind === 'coding' ? 2200 : 1400))),
+      stream: false,
+      messages: [
+        aiSystemMessage(),
+        aiTaskMessage('generateAssessmentQuestions'),
+        {
+          role: 'user',
+          content: `SUBJECT: ${subject}\nTOPIC: ${topic}\nASSESSMENT TYPE: ${kind}\nDIFFICULTY: ${difficulty}\nQUESTION COUNT: ${count}\nALLOWED QUESTION TYPES: ${allowedTypes.join(', ')}\nLEARNING OUTCOMES:\n${learningOutcomes || 'Use the trainer brief.'}\nTRAINER BRIEF:\n${brief}\n\nGenerate exactly ${count} questions. Use only the allowed types and cover the brief and learning outcomes without repeating the same concept.`,
+        },
+      ],
     })
-    return res.json({ questions: questions.length ? questions : fallback, generatedBy: questions.length ? 'ai' : 'template' })
-  } catch { return res.json({ questions: fallback, generatedBy: 'template' }) }
+    const choice = response.choices?.[0]
+    if (choice?.finish_reason === 'length') throw new Error('AI response exceeded the generation token limit')
+    const parsed = parseAiJson(choice?.message)
+    const questions = (Array.isArray(parsed.questions) ? parsed.questions : [])
+      .slice(0, count)
+      .map((question) => normalizeGeneratedQuestion(question, kind, difficulty))
+    if (questions.length !== count || questions.some((question) => !allowedTypes.includes(question.questionType) || !generatedQuestionIsUsable(question))) {
+      return res.status(502).json({ message: 'AI returned an incomplete or vague draft. Make the prompt more specific and generate again.' })
+    }
+    return res.json({ questions, generatedBy: 'ai', model: config.model })
+  } catch (error) {
+    const providerStatus = Number(error?.status || 0)
+    console.error('Assessment AI generation failed', {
+      status: providerStatus || undefined,
+      code: error?.code,
+      message: error?.message || String(error),
+    })
+    if ([404, 410].includes(providerStatus)) {
+      return res.status(503).json({ message: 'The selected AI model is no longer available. Choose another model in Platform Configuration and try again.' })
+    }
+    if ([401, 403].includes(providerStatus)) {
+      return res.status(503).json({ message: 'The AI provider rejected the configured API key. Update it in Platform Configuration.' })
+    }
+    if (providerStatus === 429) {
+      return res.status(429).json({ message: 'The AI provider is busy or its request limit was reached. Wait briefly and try again.' })
+    }
+    if (providerStatus >= 500) {
+      return res.status(502).json({ message: 'The AI provider is temporarily unavailable. Try again shortly.' })
+    }
+    const message = /token limit/i.test(error?.message || '')
+      ? 'The AI response was too long. Generate fewer questions at once.'
+      : 'AI returned an unreadable assessment. Try again or make the prompt more specific.'
+    return res.status(502).json({ message })
+  }
 })
 router.get('/attempts/me', async (req, res) => {
   const [rows] = await pool.query('SELECT t.id,t.assessment_id,t.score,t.max_score,t.percentage,t.passed,t.status,t.submitted_at,a.title,a.subject,a.results_mode,a.results_release_at FROM assessment_attempts t JOIN assessments a ON a.id=t.assessment_id WHERE t.user_id=? ORDER BY t.started_at DESC LIMIT 200', [req.user.id])

@@ -1,13 +1,13 @@
 import { Router } from 'express'
 import { pool } from '../db/pool.js'
-import { authenticate, requireAdmin } from '../middleware/auth.js'
+import { authenticate, requireAdmin, requireTrainer } from '../middleware/auth.js'
 import { APPROVAL, ASSIGNABLE_ROLES, normaliseRole, ROLES } from '../config/roles.js'
 import { sendMail } from '../services/mailer.js'
 import { recordAudit } from '../services/audit.js'
 
 const router = Router()
 
-router.use(authenticate, requireAdmin)
+router.use(authenticate)
 
 function shapeUser(row) {
   return {
@@ -32,7 +32,7 @@ const USER_COLUMNS = `id, username, first_name, last_name, email, role, approval
                       department, headline, is_active, created_at, last_login_at, rejection_reason`
 
 /** All users, filterable by role and approval status. */
-router.get('/users', async (req, res) => {
+router.get('/users', requireAdmin, async (req, res) => {
   const filters = []
   const params = []
 
@@ -68,14 +68,14 @@ router.get('/users', async (req, res) => {
 })
 
 /** Counts for the approvals badge. */
-router.get('/users/pending-count', async (_req, res) => {
+router.get('/users/pending-count', requireAdmin, async (_req, res) => {
   const [rows] = await pool.query(
     "SELECT COUNT(*) AS count FROM users WHERE approval_status = 'pending'",
   )
   return res.json({ pending: Number(rows[0]?.count || 0) })
 })
 
-router.put('/users/:id/approval', async (req, res) => {
+router.put('/users/:id/approval', requireAdmin, async (req, res) => {
   const status = String(req.body?.status || '')
   if (!Object.values(APPROVAL).includes(status)) {
     return res.status(400).json({ message: 'Status must be pending, approved or rejected' })
@@ -132,7 +132,7 @@ router.put('/users/:id/approval', async (req, res) => {
   return res.json({ updated: true, status })
 })
 
-router.put('/users/:id/role', async (req, res) => {
+router.put('/users/:id/role', requireAdmin, async (req, res) => {
   const role = normaliseRole(req.body?.role)
   if (!ASSIGNABLE_ROLES.includes(role)) {
     return res.status(400).json({ message: `Role must be one of: ${ASSIGNABLE_ROLES.join(', ')}` })
@@ -148,7 +148,7 @@ router.put('/users/:id/role', async (req, res) => {
   return res.json({ updated: true, role })
 })
 
-router.put('/users/:id/active', async (req, res) => {
+router.put('/users/:id/active', requireAdmin, async (req, res) => {
   if (Number(req.params.id) === Number(req.user.id)) {
     return res.status(400).json({ message: 'You cannot deactivate your own account' })
   }
@@ -163,7 +163,7 @@ router.put('/users/:id/active', async (req, res) => {
 })
 
 /** Aggregate dashboard for courses, enrolments, assessments and participation. */
-router.get('/dashboard', async (_req, res) => {
+router.get('/dashboard', requireAdmin, async (_req, res) => {
   const single = async (sql, params = []) => {
     try {
       const [rows] = await pool.query(sql, params)
@@ -279,7 +279,7 @@ router.get('/dashboard', async (_req, res) => {
  * Trainer-facing view of the trainees engaging with their material: enrolment,
  * assessment attempts and pass rates.
  */
-router.get('/participation', async (_req, res) => {
+router.get('/participation', requireTrainer, async (_req, res) => {
   const [rows] = await pool.query(
     `SELECT u.id, u.username, u.first_name, u.last_name, u.email,
             (SELECT COUNT(*) FROM course_enrollments e WHERE e.user_id = u.id) AS enrolments,

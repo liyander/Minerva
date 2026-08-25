@@ -294,6 +294,11 @@ function DashboardPage() {
     }
 
     const syncNotifications = () => {
+      // A backgrounded tab does not need fresh data; the visibility handler
+      // below refreshes as soon as it comes back to the foreground.
+      if (document.visibilityState !== 'visible') {
+        return
+      }
       void loadNotifications()
     }
 
@@ -314,7 +319,7 @@ function DashboardPage() {
     }
 
     syncNotifications()
-    const intervalId = window.setInterval(syncNotifications, 5000)
+    const intervalId = window.setInterval(syncNotifications, 30000)
     window.addEventListener(NOTIFICATIONS_UPDATED_EVENT, handleNotificationsUpdated)
     window.addEventListener('storage', handleStorage)
     document.addEventListener('visibilitychange', handleVisibility)

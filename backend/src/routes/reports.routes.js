@@ -32,137 +32,9 @@ function sendCsv(res, filename, columns, rows) {
   return res.send(toCsv(columns, rows))
 }
 
-const EXPORTS = {
-  users: {
-    role: 'admin',
-    filename: 'users.csv',
-    columns: [
-      { key: 'id', label: 'ID' },
-      { key: 'username', label: 'Username' },
-      { key: 'name', label: 'Name' },
-      { key: 'email', label: 'Email' },
-      { key: 'role', label: 'Role' },
-      { key: 'approval_status', label: 'Approval' },
-      { key: 'department', label: 'Department' },
-      { key: 'is_active', label: 'Active' },
-      { key: 'created_at', label: 'Joined' },
-      { key: 'last_login_at', label: 'Last login' },
-    ],
-    query: `SELECT id, username,
-                   TRIM(CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, ''))) AS name,
-                   email, role, approval_status, department, is_active, created_at, last_login_at
-            FROM users ORDER BY created_at DESC`,
-  },
-  enrolments: {
-    role: 'trainer',
-    filename: 'enrolments.csv',
-    columns: [
-      { key: 'user_name', label: 'Trainee' },
-      { key: 'email', label: 'Email' },
-      { key: 'target', label: 'Course or path' },
-      { key: 'status', label: 'Status' },
-      { key: 'enrolled_at', label: 'Enrolled' },
-      { key: 'completed_at', label: 'Completed' },
-    ],
-    query: `SELECT TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))) AS user_name,
-                   u.email, COALESCE(r.title, p.title) AS target, e.status, e.enrolled_at, e.completed_at
-            FROM course_enrollments e
-            JOIN users u ON u.id = e.user_id
-            LEFT JOIN rooms r ON r.id = e.room_id
-            LEFT JOIN career_paths p ON p.id = e.career_path_id
-            ORDER BY e.enrolled_at DESC`,
-  },
-  assessmentResults: {
-    role: 'trainer',
-    filename: 'assessment-results.csv',
-    columns: [
-      { key: 'assessment', label: 'Assessment' },
-      { key: 'subject', label: 'Subject' },
-      { key: 'user_name', label: 'Trainee' },
-      { key: 'email', label: 'Email' },
-      { key: 'score', label: 'Score' },
-      { key: 'max_score', label: 'Out of' },
-      { key: 'percentage', label: 'Percent' },
-      { key: 'passed', label: 'Passed' },
-      { key: 'submitted_at', label: 'Submitted' },
-    ],
-    query: `SELECT a.title AS assessment, a.subject,
-                   TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))) AS user_name,
-                   u.email, t.score, t.max_score, t.percentage, t.passed, t.submitted_at
-            FROM assessment_attempts t
-            JOIN assessments a ON a.id = t.assessment_id
-            JOIN users u ON u.id = t.user_id
-            WHERE t.submitted_at IS NOT NULL
-            ORDER BY t.submitted_at DESC`,
-  },
-  submissions: {
-    role: 'trainer',
-    filename: 'assignment-submissions.csv',
-    columns: [
-      { key: 'assignment', label: 'Assignment' },
-      { key: 'subject', label: 'Subject' },
-      { key: 'user_name', label: 'Trainee' },
-      { key: 'email', label: 'Email' },
-      { key: 'status', label: 'Status' },
-      { key: 'score', label: 'Score' },
-      { key: 'max_score', label: 'Out of' },
-      { key: 'passed', label: 'Passed' },
-      { key: 'is_late', label: 'Late' },
-      { key: 'submitted_at', label: 'Submitted' },
-      { key: 'graded_at', label: 'Graded' },
-    ],
-    query: `SELECT a.title AS assignment, a.subject,
-                   TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))) AS user_name,
-                   u.email, s.status, s.score, a.max_score, s.passed, s.is_late,
-                   s.submitted_at, s.graded_at
-            FROM assignment_submissions s
-            JOIN assignments a ON a.id = s.assignment_id
-            JOIN users u ON u.id = s.user_id
-            ORDER BY s.submitted_at DESC`,
-  },
-  certificates: {
-    role: 'admin',
-    filename: 'certificates.csv',
-    columns: [
-      { key: 'certificate_id', label: 'Certificate ID' },
-      { key: 'full_name', label: 'Name' },
-      { key: 'email', label: 'Email' },
-      { key: 'path_title', label: 'Awarded for' },
-      { key: 'source', label: 'Source' },
-      { key: 'issued_at', label: 'Issued' },
-    ],
-    query: `SELECT c.certificate_id, c.full_name, u.email, c.path_title, c.source, c.issued_at
-            FROM certificates c
-            JOIN users u ON u.id = c.user_id
-            ORDER BY c.issued_at DESC`,
-  },
-  participation: {
-    role: 'trainer',
-    filename: 'participation.csv',
-    columns: [
-      { key: 'name', label: 'Trainee' },
-      { key: 'email', label: 'Email' },
-      { key: 'department', label: 'Department' },
-      { key: 'enrolments', label: 'Enrolments' },
-      { key: 'attempts', label: 'Assessment attempts' },
-      { key: 'avg_score', label: 'Average score' },
-      { key: 'submissions', label: 'Assignments submitted' },
-      { key: 'certificates', label: 'Certificates' },
-      { key: 'last_login_at', label: 'Last login' },
-    ],
-    query: `SELECT TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))) AS name,
-                   u.email, u.department,
-                   (SELECT COUNT(*) FROM course_enrollments e WHERE e.user_id = u.id) AS enrolments,
-                   (SELECT COUNT(*) FROM assessment_attempts t WHERE t.user_id = u.id AND t.submitted_at IS NOT NULL) AS attempts,
-                   (SELECT ROUND(AVG(t.percentage)) FROM assessment_attempts t WHERE t.user_id = u.id AND t.submitted_at IS NOT NULL) AS avg_score,
-                   (SELECT COUNT(*) FROM assignment_submissions s WHERE s.user_id = u.id) AS submissions,
-                   (SELECT COUNT(*) FROM certificates c WHERE c.user_id = u.id) AS certificates,
-                   u.last_login_at
-            FROM users u
-            WHERE u.role IN ('trainee', 'operator')
-            ORDER BY attempts DESC`,
-  },
-}
+import { EXPORTS } from '../config/exports.js'
+import fs from 'fs'
+import path from 'path'
 
 /** Which exports the caller may run. */
 router.get('/exports', requireTrainer, (req, res) => {
@@ -190,6 +62,48 @@ router.get('/exports/:key', requireTrainer, async (req, res) => {
   }
 
   return sendCsv(res, config.filename, config.columns, rows)
+})
+
+router.post('/jobs', requireTrainer, async (req, res) => {
+  const { reportType, format = 'csv', filters = {} } = req.body
+  const config = EXPORTS[reportType]
+  
+  if (!config) return res.status(404).json({ message: 'Unknown report type' })
+  if (config.role === 'admin' && !isRole(req.user.role, ROLES.ADMIN)) {
+    return res.status(403).json({ message: 'That export is admin-only' })
+  }
+
+  const [result] = await pool.query(
+    'INSERT INTO report_jobs (user_id, report_type, format, filters_json, status) VALUES (?, ?, ?, ?, "pending")',
+    [req.user.id, reportType, format, JSON.stringify(filters)]
+  )
+
+  res.json({ jobId: result.insertId, status: 'pending' })
+})
+
+router.get('/jobs/:id', requireTrainer, async (req, res) => {
+  const [rows] = await pool.query('SELECT id, report_type, format, status, error_message, created_at, completed_at FROM report_jobs WHERE id = ? AND user_id = ?', [req.params.id, req.user.id])
+  if (!rows.length) return res.status(404).json({ message: 'Job not found' })
+  res.json(rows[0])
+})
+
+router.get('/download/:id', requireTrainer, async (req, res) => {
+  const [rows] = await pool.query('SELECT file_url, format, report_type FROM report_jobs WHERE id = ? AND user_id = ? AND status = "completed"', [req.params.id, req.user.id])
+  if (!rows.length) return res.status(404).json({ message: 'File not ready or not found' })
+
+  const job = rows[0]
+  const filePath = path.join(process.cwd(), job.file_url)
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ message: 'File has been deleted' })
+  }
+
+  const contentType = job.format === 'pdf' ? 'application/pdf' : 'text/csv'
+  res.setHeader('Content-Type', contentType)
+  res.setHeader('Content-Disposition', `attachment; filename="${job.report_type}.${job.format}"`)
+  
+  const fileStream = fs.createReadStream(filePath)
+  fileStream.pipe(res)
 })
 
 /* ------------------------------------------------- trainer own dashboard --- */

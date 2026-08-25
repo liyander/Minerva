@@ -80,6 +80,11 @@ function Navbar({ config, isSidebarOpen, onLogout, onToggleSidebar }) {
     }
 
     const syncNotifications = () => {
+      // A backgrounded tab does not need fresh data; the visibility handler
+      // below refreshes as soon as it comes back to the foreground.
+      if (document.visibilityState !== 'visible') {
+        return
+      }
       void fetchNotifications()
     }
 
@@ -102,7 +107,7 @@ function Navbar({ config, isSidebarOpen, onLogout, onToggleSidebar }) {
     syncNotifications()
 
     // Keep fallback polling for cross-device updates.
-    const interval = window.setInterval(syncNotifications, 5000)
+    const interval = window.setInterval(syncNotifications, 30000)
     window.addEventListener(NOTIFICATIONS_UPDATED_EVENT, handleNotificationsUpdated)
     window.addEventListener('storage', handleStorage)
     document.addEventListener('visibilitychange', handleVisibility)

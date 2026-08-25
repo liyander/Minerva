@@ -57,7 +57,7 @@ function Sidebar({ config, isSidebarOpen, onClose }) {
     }
 
     void loadSessions()
-    const intervalId = window.setInterval(loadSessions, 15000)
+    const intervalId = window.setInterval(loadSessions, 45000)
 
     return () => {
       cancelled = true
@@ -81,6 +81,7 @@ function Sidebar({ config, isSidebarOpen, onClose }) {
             { to: '/trainer?tab=library', icon: 'video_library', label: 'Content library', end: true },
             { to: '/community', icon: 'meeting_room', label: 'Classrooms' },
             { heading: 'Management' },
+            { to: '/admin/students', icon: 'query_stats', label: 'Student Monitor', end: true },
             { to: '/trainer?tab=trainees', icon: 'groups', label: 'Learners', end: true },
             { to: '/trainer?tab=cohorts', icon: 'group_work', label: 'Cohorts', end: true },
             { to: '/trainer?tab=compliance', icon: 'fact_check', label: 'Required training', end: true },

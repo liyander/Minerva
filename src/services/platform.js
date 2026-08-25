@@ -145,6 +145,8 @@ export const fetchPublicShare = (token) => apiFetch(`/experience/public/${token}
 export const fetchExportList = () => apiFetch('/reports/exports')
 export const fetchExportData = (key) => apiFetch(`/reports/exports/${key}?format=json`)
 export const fetchTrainerDashboard = () => apiFetch('/reports/trainer/me')
+export const createExportJob = (payload) => apiFetch('/reports/jobs', { method: 'POST', ...json(payload) })
+export const fetchExportJob = (id) => apiFetch(`/reports/jobs/${id}`)
 export const fetchAuditLog = (params) => apiFetch(`/reports/audit${query(params)}`)
 export const fetchAuditActions = () => apiFetch('/reports/audit/actions')
 export const fetchMailStatus = () => apiFetch('/reports/mail/status')
@@ -163,6 +165,23 @@ export async function downloadExport(key, filename) {
   const link = document.createElement('a')
   link.href = url
   link.download = filename || `${key}.csv`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
+export async function downloadExportJob(id, filename) {
+  const response = await fetch(`${API_BASE_URL}/reports/download/${id}`, {
+    headers: { Authorization: `Bearer ${getAuthToken()}` },
+  })
+  if (!response.ok) throw new Error('File download failed')
+
+  const blob = await response.blob()
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename || `report_${id}`
   document.body.appendChild(link)
   link.click()
   link.remove()

@@ -238,7 +238,9 @@ function App() {
       }
     }
 
-    const intervalId = window.setInterval(syncNow, 8000)
+    // Every tick re-downloads the full course, path and resource catalogue, so
+    // this is deliberately infrequent; edits also push updates through events.
+    const intervalId = window.setInterval(syncNow, 120000)
     void syncNow()
     return () => {
       cancelled = true
@@ -371,8 +373,6 @@ function App() {
           <Route path="/admin/insights" element={<AdminInsightsPage />} />
           <Route path="/admin/homepage" element={<AdminHomepagePage />} />
           <Route path="/admin/competencies" element={<AdminCompetencyPage />} />
-          <Route path="/admin/students" element={<AdminStudentMonitorPage />} />
-          <Route path="/admin/students/:userId" element={<AdminStudentStatsPage />} />
           <Route path="/admin/cohorts" element={<AdminCohortsPage />} />
           <Route path="/admin/compliance" element={<AdminCompliancePage />} />
           <Route path="/admin/reports" element={<AdminReportsPage />} />
@@ -437,7 +437,10 @@ function App() {
               element={<GradingQueuePage />}
             />
             <Route path="/trainer/question-banks" element={<QuestionBankPage />} />
+            <Route path="/admin/reports" element={<AdminReportsPage />} />
             <Route path="/library" element={<TrainerLibraryPage />} />
+            <Route path="/admin/students" element={<AdminStudentMonitorPage />} />
+            <Route path="/admin/students/:userId" element={<AdminStudentStatsPage />} />
             <Route path="/assessments" element={<AssessmentsPage />} />
             <Route path="/assessments/:assessmentId" element={<AssessmentAttemptPage />} />
             <Route path="/leaderboard" element={<LeaderboardPage />} />

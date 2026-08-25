@@ -4,6 +4,7 @@ import { pool } from '../db/pool.js'
 import { authenticate, requireAdmin } from '../middleware/auth.js'
 import { getAiRuntimeConfig } from '../services/aiSettings.js'
 import { executeCodeOnServer } from '../services/codeExecutor.js'
+import { aiSystemMessage, aiTaskMessage } from '../services/aiPrompts.js'
 
 const router = Router()
 let schemaReady = false
@@ -325,11 +326,8 @@ async function generateQuizQuestions(project, count, priorPrompts = []) {
       max_tokens: Math.min(8000, Math.max(2000, count * 400)),
       stream: false,
       messages: [
-        {
-          role: 'system',
-          content:
-            'You are a strict examiner for a lab research knowledge check. Using ONLY the supplied project documentation, write comprehension questions that verify the learner truly understood the project: its implementation, its technology stack, and the topics one must learn to build a similar project. Return strict JSON only: {"questions":[{"prompt":"string","idealAnswer":"string","rubric":"string"}]}. Every question must be answerable from the supplied content. Mix conceptual, implementation-detail, and "how would you rebuild this" questions. NEVER repeat or closely paraphrase any prompt in excludedPrompts — every question must be genuinely new; vary the angle, the sub-topic, and the phrasing. Ideal answers must be grounded in the documentation.',
-        },
+        aiSystemMessage(),
+        aiTaskMessage('generateProjectQuestions'),
         {
           role: 'user',
           content: JSON.stringify({
@@ -394,11 +392,8 @@ async function evaluateQuizAnswer(project, question, answer) {
       max_tokens: 900,
       stream: false,
       messages: [
-        {
-          role: 'system',
-          content:
-            'Grade one knowledge-check answer about a documented lab research project. Return strict JSON only: {"score":0-100,"isCorrect":true|false,"feedback":"string"}. The answer is correct (isCorrect true, score >= 75) only when it demonstrates genuine understanding consistent with the project documentation and ideal answer; accept equivalent correct phrasing. Give short, specific feedback telling the learner what to improve when incorrect.',
-        },
+        aiSystemMessage(),
+        aiTaskMessage('gradeProjectAnswer'),
         {
           role: 'user',
           content: JSON.stringify({
@@ -510,12 +505,6 @@ function buildFallbackCodeChallenge(project) {
   }
 }
 
-const FUNCTION_CHALLENGE_PROMPT =
-  'Design one self-contained coding challenge inspired by a documented lab research project. Return strict JSON only: {"scenario":"string","language":"string","starterCode":"string","testCases":[{"input":"string","expectedOutput":"string","description":"string"}]}. Rules: the challenge must be solvable as a single pure function named solve(input) that takes one string input and returns a value whose JSON serialization is compared to expectedOutput; pick the language that matches the project stack (javascript or python); write a realistic scenario tied to the project domain (2-3 paragraphs); provide 3-6 deterministic test cases including at least one edge case; expectedOutput must be exact JSON-serializable text.'
-
-const UI_CHALLENGE_PROMPT =
-  'Design one self-contained front-end UI coding challenge inspired by a documented web project. The player writes a SINGLE standalone HTML file (inline CSS and JavaScript, no external resources) that is rendered in a sandboxed iframe. Return strict JSON only: {"scenario":"string","testCases":[{"description":"string","expression":"string"}]}. Rules: the scenario (2-3 paragraphs) must describe a concrete small UI feature tied to the project domain, listing exact required element ids/classes and behaviors; provide 4-8 test cases where each expression is a single synchronous JavaScript boolean expression evaluated inside the rendered page with full DOM access (document, querySelector, simulated .click() calls are allowed); expressions must be deterministic, self-contained, must not use async/await, timers, network, or alert/confirm/prompt; each expression must verify exactly what its description says; include at least one interaction check that clicks an element and asserts the resulting DOM change.'
-
 async function generateCodeChallenge(project) {
   const aiConfig = await getAiRuntimeConfig()
   if (!aiConfig.apiKey) return buildFallbackCodeChallenge(project)
@@ -529,7 +518,8 @@ async function generateCodeChallenge(project) {
       max_tokens: 3000,
       stream: false,
       messages: [
-        { role: 'system', content: isUi ? UI_CHALLENGE_PROMPT : FUNCTION_CHALLENGE_PROMPT },
+        aiSystemMessage(),
+        aiTaskMessage(isUi ? 'generateUiChallenge' : 'generateFunctionChallenge'),
         {
           role: 'user',
           content: JSON.stringify({
@@ -623,11 +613,8 @@ async function evaluateCodeSubmission(project, challenge, code) {
       max_tokens: 2500,
       stream: false,
       messages: [
-        {
-          role: 'system',
-          content:
-            'You are a meticulous code judge. Execute the submitted solve(input) implementation mentally against each supplied test case, exactly as an interpreter would. Return strict JSON only: {"results":[{"index":1,"passed":true|false,"actualOutput":"string","detail":"string"}],"passed":true|false,"feedback":"string"}. Mark a test passed ONLY when the code, run correctly, would produce output whose JSON serialization matches expectedOutput exactly. Syntax errors, missing solve function, hardcoding expected outputs without real logic, or wrong results fail the relevant tests. "passed" is true only when every test passes. Feedback must be short, concrete, and mention the first failing behavior when failing.',
-        },
+        aiSystemMessage(),
+        aiTaskMessage('judgeCodeSubmission'),
         {
           role: 'user',
           content: JSON.stringify({
@@ -789,11 +776,8 @@ async function gradeUiSubmission(challenge, code, browserResults) {
       max_tokens: 1500,
       stream: false,
       messages: [
-        {
-          role: 'system',
-          content:
-            'You audit a front-end submission. Given a standalone HTML file and a list of DOM checks (JavaScript boolean expressions with descriptions), decide for each check whether the HTML, when rendered, would genuinely satisfy it. Flag code that games the checks without implementing the described feature (e.g. hidden elements that only satisfy selectors, overriding querySelector, stubbing click handlers to just set text). Return strict JSON only: {"checks":[{"index":1,"satisfied":true|false,"reason":"string"}],"verdict":"pass|fail","feedback":"string"}.',
-        },
+        aiSystemMessage(),
+        aiTaskMessage('auditUiSubmission'),
         {
           role: 'user',
           content: JSON.stringify({

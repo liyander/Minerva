@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PageHeader from '../../components/PageHeader'
 import {
-  downloadExport,
+  createExportJob,
+  fetchExportJob,
+  downloadExportJob,
   fetchAuditActions,
   fetchAuditLog,
   fetchExportData,
@@ -12,6 +14,7 @@ import {
   runDigest,
   runReminders,
 } from '../../services/platform'
+import { getAuthSession, hasRole, ROLES } from '../../auth'
 
 const EXPORT_META = {
   users: { label: 'Users', icon: 'group', blurb: 'Every account with role, approval and last sign-in.' },
@@ -31,6 +34,9 @@ function formatBytes(bytes) {
 
 function AdminReportsPage() {
   const navigate = useNavigate()
+  const session = getAuthSession()
+  const isAdmin = session && hasRole(session.role, ROLES.ADMIN)
+  
   const [tab, setTab] = useState('exports')
   const [exports, setExports] = useState([])
   const [audit, setAudit] = useState([])
@@ -48,10 +54,10 @@ function AdminReportsPage() {
     try {
       const [exportRows, auditRows, actionRows, mailRow, storageRow] = await Promise.all([
         fetchExportList(),
-        fetchAuditLog({ limit: 100 }),
-        fetchAuditActions().catch(() => []),
-        fetchMailStatus().catch(() => null),
-        fetchStorageStats().catch(() => null),
+        isAdmin ? fetchAuditLog({ limit: 100 }).catch(() => []) : Promise.resolve([]),
+        isAdmin ? fetchAuditActions().catch(() => []) : Promise.resolve([]),
+        isAdmin ? fetchMailStatus().catch(() => null) : Promise.resolve(null),
+        isAdmin ? fetchStorageStats().catch(() => null) : Promise.resolve(null),
       ])
       setExports(exportRows)
       setAudit(auditRows)
@@ -74,12 +80,30 @@ function AdminReportsPage() {
       .catch(() => setAudit([]))
   }, [tab, actionFilter])
 
-  const download = async (key) => {
-    setBusy(key)
+  const runJobAndDownload = async (key, format) => {
+    const busyKey = format === 'pdf' ? `pdf-${key}` : key
+    setBusy(busyKey)
     setError('')
     try {
-      await downloadExport(key, EXPORT_META[key]?.filename)
-      setNotice(`${EXPORT_META[key]?.label || key} downloaded.`)
+      const { jobId } = await createExportJob({ reportType: key, format })
+      setNotice(`Job #${jobId} queued. Generating ${format.toUpperCase()}...`)
+      
+      let jobStatus = 'pending'
+      let errorMsg = ''
+      while (jobStatus === 'pending' || jobStatus === 'processing') {
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        const statusCheck = await fetchExportJob(jobId)
+        jobStatus = statusCheck.status
+        errorMsg = statusCheck.error_message
+      }
+      
+      if (jobStatus === 'failed') {
+        throw new Error(errorMsg || 'Job failed')
+      }
+      
+      const filename = EXPORT_META[key]?.filename ? `${EXPORT_META[key].filename}.${format}` : `${key}.${format}`
+      await downloadExportJob(jobId, filename)
+      setNotice(`${EXPORT_META[key]?.label || key} downloaded successfully.`)
     } catch (downloadError) {
       setError(downloadError?.message || 'Download failed.')
     } finally {
@@ -87,59 +111,8 @@ function AdminReportsPage() {
     }
   }
 
-  /**
-   * PDF is produced by opening a print-ready window: no extra dependency, and
-   * the browser's own dialog handles paper size and "save as PDF".
-   */
-  const printPdf = async (key) => {
-    setBusy(`pdf-${key}`)
-    setError('')
-    try {
-      const data = await fetchExportData(key)
-      const meta = EXPORT_META[key] || { label: key }
-
-      const html = `<!doctype html><html><head><meta charset="utf-8">
-        <title>${meta.label} — Minerva</title>
-        <style>
-          body{font-family:Inter,Arial,sans-serif;margin:32px;color:#1b2233}
-          h1{font-size:20px;margin:0 0 4px}
-          p.meta{font-size:12px;color:#6b7488;margin:0 0 20px}
-          table{width:100%;border-collapse:collapse;font-size:11px}
-          th{text-align:left;background:#f1f3f8;padding:8px;border-bottom:2px solid #e3e7ef}
-          td{padding:7px 8px;border-bottom:1px solid #eef0f6}
-          tr:nth-child(even) td{background:#fbfbfe}
-          @media print{@page{margin:14mm}}
-        </style></head><body>
-        <h1>${meta.label}</h1>
-        <p class="meta">Minerva Academy · ${data.rows.length} rows · generated ${new Date().toLocaleString()}</p>
-        <table><thead><tr>${data.columns
-          .map((column) => `<th>${column.label}</th>`)
-          .join('')}</tr></thead><tbody>
-        ${data.rows
-          .map(
-            (row) =>
-              `<tr>${data.columns
-                .map((column) => `<td>${row[column.key] ?? ''}</td>`)
-                .join('')}</tr>`,
-          )
-          .join('')}
-        </tbody></table></body></html>`
-
-      const win = window.open('', '_blank')
-      if (!win) {
-        setError('Allow pop-ups to produce a PDF.')
-        return
-      }
-      win.document.write(html)
-      win.document.close()
-      win.focus()
-      window.setTimeout(() => win.print(), 400)
-    } catch (printError) {
-      setError(printError?.message || 'Could not build the PDF.')
-    } finally {
-      setBusy('')
-    }
-  }
+  const download = (key) => runJobAndDownload(key, 'csv')
+  const printPdf = (key) => runJobAndDownload(key, 'pdf')
 
   const pill = 'rounded-full px-5 py-2.5 font-headline text-sm font-bold transition-opacity hover:opacity-90 disabled:opacity-60'
 
@@ -148,42 +121,44 @@ function AdminReportsPage() {
       <div className="mx-auto max-w-6xl space-y-6">
         <button
           className="inline-flex items-center gap-1 font-headline text-sm font-bold text-on-surface-variant hover:text-on-surface transition-colors"
-          onClick={() => navigate('/admin')}
+          onClick={() => navigate(isAdmin ? '/admin' : '/trainer')}
           type="button"
         >
           <span className="material-symbols-outlined text-base">arrow_back</span>
-          Back to admin
+          {isAdmin ? 'Back to admin' : 'Back to workspace'}
         </button>
 
         <PageHeader
           accent="lavender"
-          description="Download the data behind the dashboards, review who changed what, and run the notification jobs."
+          description={isAdmin ? "Download the data behind the dashboards, review who changed what, and run the notification jobs." : "Download the data behind the dashboards."}
           eyebrow="Reports"
           icon="download"
-          title="Exports & audit"
+          title={isAdmin ? "Exports & audit" : "Exports"}
         />
 
-        <div className="flex flex-wrap gap-2">
-          {[
-            { id: 'exports', label: 'Exports', icon: 'download' },
-            { id: 'audit', label: 'Audit log', icon: 'history' },
-            { id: 'system', label: 'Mail & storage', icon: 'settings_suggest' },
-          ].map((item) => (
-            <button
-              className={`inline-flex items-center gap-2 rounded-full px-4 py-2.5 font-headline text-sm font-bold transition-colors ${
-                tab === item.id
-                  ? 'bg-primary text-on-primary'
-                  : 'bg-surface-container-lowest text-on-surface-variant hover:text-on-surface'
-              }`}
-              key={item.id}
-              onClick={() => setTab(item.id)}
-              type="button"
-            >
-              <span className="material-symbols-outlined text-base">{item.icon}</span>
-              {item.label}
-            </button>
-          ))}
-        </div>
+        {isAdmin ? (
+          <div className="flex flex-wrap gap-2">
+            {[
+              { id: 'exports', label: 'Exports', icon: 'download' },
+              { id: 'audit', label: 'Audit log', icon: 'history' },
+              { id: 'system', label: 'Mail & storage', icon: 'settings_suggest' },
+            ].map((item) => (
+              <button
+                className={`inline-flex items-center gap-2 rounded-full px-4 py-2.5 font-headline text-sm font-bold transition-colors ${
+                  tab === item.id
+                    ? 'bg-primary text-on-primary'
+                    : 'bg-surface-container-lowest text-on-surface-variant hover:text-on-surface'
+                }`}
+                key={item.id}
+                onClick={() => setTab(item.id)}
+                type="button"
+              >
+                <span className="material-symbols-outlined text-base">{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
         {error ? (
           <div className="rounded-2xl bg-blush p-4">

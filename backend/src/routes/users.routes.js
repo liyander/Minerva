@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs'
 import { Router } from 'express'
 import { pool } from '../db/pool.js'
-import { authenticate, requireAdmin } from '../middleware/auth.js'
+import { authenticate, requireAdmin, requireTrainer } from '../middleware/auth.js'
 
 const router = Router()
 
@@ -406,7 +406,7 @@ router.post('/admin/registrations/:id/password', authenticate, requireAdmin, asy
   return res.json({ changed: true, userId })
 })
 
-router.get('/admin/registrations/:id', authenticate, requireAdmin, async (req, res) => {
+router.get('/admin/registrations/:id', authenticate, requireTrainer, async (req, res) => {
   const userId = Number(req.params.id)
   if (!Number.isFinite(userId)) {
     return res.status(400).json({ message: 'Invalid user id' })
@@ -446,7 +446,7 @@ router.get('/admin/registrations/:id', authenticate, requireAdmin, async (req, r
   return res.json(rows[0])
 })
 
-router.get('/admin/registrations/:id/theoretical-attempts', authenticate, requireAdmin, async (req, res) => {
+router.get('/admin/registrations/:id/theoretical-attempts', authenticate, requireTrainer, async (req, res) => {
   const userId = Number(req.params.id)
   if (!Number.isInteger(userId) || userId <= 0) {
     return res.status(400).json({ message: 'Invalid user id' })
@@ -502,7 +502,7 @@ router.get('/admin/registrations/:id/theoretical-attempts', authenticate, requir
   return res.json(attempts)
 })
 
-router.get('/admin/registrations/:id/completed-rooms', authenticate, requireAdmin, async (req, res) => {
+router.get('/admin/registrations/:id/completed-rooms', authenticate, requireTrainer, async (req, res) => {
   const userId = Number(req.params.id)
   if (!Number.isInteger(userId) || userId <= 0) {
     return res.status(400).json({ message: 'Invalid user id' })
@@ -573,7 +573,7 @@ router.get('/admin/registrations/:id/completed-rooms', authenticate, requireAdmi
   })
 })
 
-router.get('/admin/registrations/:id/room-activity', authenticate, requireAdmin, async (req, res) => {
+router.get('/admin/registrations/:id/room-activity', authenticate, requireTrainer, async (req, res) => {
   const userId = Number(req.params.id)
   if (!Number.isInteger(userId) || userId <= 0) {
     return res.status(400).json({ message: 'Invalid user id' })
