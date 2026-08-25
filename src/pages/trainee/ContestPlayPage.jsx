@@ -151,7 +151,7 @@ export default function ContestPlayPage() {
   }
 
   return (
-    <main className="min-h-screen pt-24 p-3 sm:p-6 max-w-4xl mx-auto flex flex-col justify-between space-y-4">
+    <main className="min-h-[calc(100dvh-5rem)] p-3 pt-24 pb-6 sm:p-6 sm:pt-24 max-w-4xl mx-auto flex flex-col space-y-4">
       {/* Top Header Bar */}
       <div className="flex items-center justify-between gap-2 bg-surface-container-lowest p-3 sm:p-4 rounded-2xl border border-outline-variant/60">
         <div className="flex items-center gap-2.5 min-w-0">

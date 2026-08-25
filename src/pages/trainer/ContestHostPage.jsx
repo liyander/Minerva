@@ -167,7 +167,7 @@ export default function ContestHostPage() {
   const isLastQuestion = currentIdx >= totalQ - 1
 
   return (
-    <main className="min-h-screen pt-24 p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-6">
+    <main className="min-h-screen p-4 pt-24 sm:p-6 sm:pt-24 lg:p-8 lg:pt-24 max-w-6xl mx-auto space-y-6">
       {/* Top Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface-container-lowest p-4 rounded-2xl border border-outline-variant/60">
         <div className="flex items-center gap-3">

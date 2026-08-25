@@ -286,7 +286,7 @@ export default function ContestEditorPage() {
   }
 
   return (
-    <main className="min-h-screen pt-24 p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-6">
+    <main className="min-h-screen p-4 pt-24 sm:p-6 sm:pt-24 lg:p-8 lg:pt-24 max-w-6xl mx-auto space-y-6">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
