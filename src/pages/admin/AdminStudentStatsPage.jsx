@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import PageHeader from '../../components/PageHeader'
 import { apiFetch } from '../../services/api'
 import { defaultCourses } from '../../data/coursesData'
+import { fetchStudentProgression, fastTrackModule, saveGatingOverride } from '../../services/platform'
 
 // Simple CSS Bar Chart for XP by Category
 function CategoryXpChart({ completedRooms }) {
@@ -297,9 +298,12 @@ function AdminStudentStatsPage() {
   const [completedRooms, setCompletedRooms] = useState(null)
   const [roomActivity, setRoomActivity] = useState(null)
   const [profile, setProfile] = useState(null)
+  const [progressionData, setProgressionData] = useState(null)
   
   const [activeTab, setActiveTab] = useState('overview')
   const [isLoading, setIsLoading] = useState(true)
+  const [actionBusy, setActionBusy] = useState(false)
+  const [actionMessage, setActionMessage] = useState('')
   const [error, setError] = useState('')
 
   const load = useCallback(async () => {
@@ -310,14 +314,16 @@ function AdminStudentStatsPage() {
       const studentData = await apiFetch(`/users/admin/registrations/${userId}`)
       setStudent(studentData)
 
-      // Fetch completed rooms & activity
-      const [completedData, activityData] = await Promise.all([
+      // Fetch completed rooms & activity & progression
+      const [completedData, activityData, progression] = await Promise.all([
         apiFetch(`/users/admin/registrations/${userId}/completed-rooms`),
-        apiFetch(`/users/admin/registrations/${userId}/room-activity`)
+        apiFetch(`/users/admin/registrations/${userId}/room-activity`),
+        fetchStudentProgression(userId).catch(() => null),
       ])
       
       setCompletedRooms(completedData)
       setRoomActivity(activityData)
+      setProgressionData(progression)
 
       // Fetch full public profile (ignore errors if profile doesn't exist)
       try {
@@ -338,6 +344,34 @@ function AdminStudentStatsPage() {
     void load()
   }, [load])
 
+  const handleFastTrack = async (moduleId) => {
+    setActionBusy(true)
+    setActionMessage('')
+    try {
+      await fastTrackModule(userId, { moduleId, reason: 'Admin fast-track override' })
+      setActionMessage('Module fast-tracked and unlocked successfully.')
+      await load()
+    } catch (err) {
+      setError(err?.message || 'Failed to fast-track module.')
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
+  const handleRevokeOverride = async (moduleId) => {
+    setActionBusy(true)
+    setActionMessage('')
+    try {
+      await saveGatingOverride(moduleId, userId, { granted: false })
+      setActionMessage('Module override revoked.')
+      await load()
+    } catch (err) {
+      setError(err?.message || 'Failed to revoke override.')
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <main className="min-h-screen bg-surface px-5 py-8 sm:px-8 lg:px-10 pt-24 flex items-center justify-center">
@@ -346,7 +380,7 @@ function AdminStudentStatsPage() {
     )
   }
 
-  if (error || !student) {
+  if (error && !student) {
     return (
       <main className="min-h-screen bg-surface px-5 py-8 sm:px-8 lg:px-10 pt-24">
         <div className="mx-auto max-w-4xl space-y-6">
@@ -370,6 +404,7 @@ function AdminStudentStatsPage() {
   
   const TABS = [
     { id: 'overview', label: 'Overview', icon: 'monitoring' },
+    { id: 'progression', label: 'Dynamic Progression', icon: 'account_tree' },
     { id: 'enrollments', label: 'Enrollments', icon: 'school' },
     { id: 'profile', label: 'Full Profile', icon: 'person' }
   ]
@@ -525,6 +560,312 @@ function AdminStudentStatsPage() {
                 </div>
 
                 <SkillGapAnalysis roomActivity={roomActivity} defaultCourses={defaultCourses} />
+              </div>
+            )}
+
+            {/* TAB: DYNAMIC PROGRESSION */}
+            {activeTab === 'progression' && (
+              <div className="space-y-6 animate-in fade-in duration-300">
+                {actionMessage && (
+                  <div className="rounded-2xl bg-mint/20 border border-mint/40 p-4 text-mint flex items-center justify-between">
+                    <span className="text-sm font-bold">{actionMessage}</span>
+                    <button onClick={() => setActionMessage('')} className="text-xs font-bold underline">Dismiss</button>
+                  </div>
+                )}
+
+                {/* Risk / Stalling Indicator */}
+                {progressionData?.risk?.isStalling && (
+                  <div className="rounded-3xl bg-blush/15 border border-blush/30 p-6 shadow-soft">
+                    <div className="flex items-start gap-4">
+                      <span className="material-symbols-outlined text-3xl text-blush">warning</span>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-headline text-base font-bold text-on-background">At-Risk Progression Stalling Detected</h4>
+                          <span className="bg-blush text-on-blush text-xs px-2.5 py-0.5 rounded-full font-bold uppercase">
+                            {progressionData.risk.riskLevel} Risk
+                          </span>
+                        </div>
+                        <ul className="mt-2 space-y-1 text-sm font-body text-on-surface-variant list-disc list-inside">
+                          {progressionData.risk.reasons.map((r, i) => (
+                            <li key={i}>{r}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Gamification & Mastery Overview */}
+                <div className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft">
+                  <h3 className="font-headline text-lg font-bold text-on-background flex items-center gap-2 mb-6">
+                    <span className="material-symbols-outlined text-primary">military_tech</span>
+                    Learner Mastery & XP Tier
+                  </h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Current Rank & Tier */}
+                    <div className="flex flex-col items-center justify-center p-6 bg-surface rounded-2xl border border-outline-variant/20 text-center">
+                      <span className="material-symbols-outlined text-5xl text-primary mb-2">
+                        {progressionData?.gamification?.tierIcon || 'shield'}
+                      </span>
+                      <span className="text-xs uppercase font-bold text-on-surface-variant tracking-wider">Current Tier</span>
+                      <h4 className="font-headline text-2xl font-bold text-on-background mt-1">
+                        {progressionData?.gamification?.currentTier || 'Novice'}
+                      </h4>
+                      <p className="text-xs text-on-surface-variant mt-1">Level {progressionData?.gamification?.level || 1}</p>
+
+                      {progressionData?.gamification?.nextTier && (
+                        <div className="w-full mt-4 space-y-1">
+                          <div className="flex justify-between text-[10px] font-bold text-on-surface-variant">
+                            <span>Next: {progressionData.gamification.nextTier}</span>
+                            <span>{progressionData.gamification.progressToNextTier}%</span>
+                          </div>
+                          <div className="w-full h-2 bg-surface-container-high rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-primary rounded-full transition-all duration-500"
+                              style={{ width: `${progressionData.gamification.progressToNextTier}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Streak & Multiplier */}
+                    <div className="flex flex-col justify-between p-6 bg-surface rounded-2xl border border-outline-variant/20">
+                      <div>
+                        <div className="flex items-center gap-2 text-butter mb-2">
+                          <span className="material-symbols-outlined text-2xl">local_fire_department</span>
+                          <span className="font-headline text-sm font-bold uppercase tracking-wider text-on-background">Study Streak</span>
+                        </div>
+                        <p className="text-3xl font-headline font-bold text-on-background mt-2">
+                          {progressionData?.gamification?.streakDays || 0} <span className="text-sm font-normal text-on-surface-variant">days</span>
+                        </p>
+                      </div>
+                      <div className="pt-4 border-t border-outline-variant/10 flex justify-between items-center text-xs text-on-surface-variant">
+                        <span>XP Multiplier:</span>
+                        <span className="font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">
+                          {progressionData?.gamification?.streakMultiplier || 1.0}x
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* XP Distribution */}
+                    <div className="p-6 bg-surface rounded-2xl border border-outline-variant/20 space-y-3">
+                      <span className="font-headline text-xs font-bold uppercase tracking-wider text-on-surface-variant">XP Breakdown</span>
+                      <div className="space-y-2 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-on-surface-variant">Rooms Completed:</span>
+                          <span className="font-bold text-on-background">{progressionData?.gamification?.roomXp || 0} XP</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-on-surface-variant">Assessments:</span>
+                          <span className="font-bold text-on-background">{progressionData?.gamification?.assessmentXp || 0} XP</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-on-surface-variant">Project Milestones:</span>
+                          <span className="font-bold text-on-background">{progressionData?.gamification?.projectXp || 0} XP</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-on-surface-variant">Attendance:</span>
+                          <span className="font-bold text-on-background">{progressionData?.gamification?.attendanceXp || 0} XP</span>
+                        </div>
+                      </div>
+                      <div className="pt-2 border-t border-outline-variant/10 flex justify-between font-bold text-sm text-primary">
+                        <span>Total XP:</span>
+                        <span>{progressionData?.gamification?.totalXp || 0} XP</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Milestone Badges */}
+                  <div className="mt-6 pt-6 border-t border-outline-variant/20">
+                    <h4 className="font-headline text-sm font-bold text-on-background mb-4">Earned Milestones & Badges</h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                      {progressionData?.gamification?.allMilestones?.map((m) => (
+                        <div
+                          key={m.key}
+                          className={`p-3 rounded-2xl border text-center transition-all ${
+                            m.unlocked
+                              ? 'bg-primary/5 border-primary/30 text-on-background'
+                              : 'bg-surface/50 border-outline-variant/10 opacity-40'
+                          }`}
+                        >
+                          <span className={`material-symbols-outlined text-2xl mb-1 ${m.unlocked ? 'text-primary' : 'text-on-surface-variant'}`}>
+                            {m.icon}
+                          </span>
+                          <p className="font-headline text-xs font-bold truncate" title={m.title}>{m.title}</p>
+                          <p className="text-[10px] text-on-surface-variant mt-0.5">{m.unlocked ? `+${m.xp} XP` : 'Locked'}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Career Paths & Adaptive Gating Matrix */}
+                <div className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft space-y-6">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-headline text-lg font-bold text-on-background flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary">account_tree</span>
+                      Path Progression & Gating Rules
+                    </h3>
+                    <span className="text-xs text-on-surface-variant font-bold">
+                      {progressionData?.pathProgress?.length || 0} Enrolled Path(s)
+                    </span>
+                  </div>
+
+                  {progressionData?.pathProgress?.length > 0 ? (
+                    progressionData.pathProgress.map((path) => (
+                      <div key={path.pathId} className="border border-outline-variant/20 rounded-2xl p-5 bg-surface space-y-4">
+                        <div className="flex justify-between items-center border-b border-outline-variant/10 pb-3">
+                          <h4 className="font-headline text-base font-bold text-on-background">{path.pathTitle}</h4>
+                          <span className="text-xs bg-surface-container-high px-3 py-1 rounded-full font-bold text-on-surface-variant">
+                            {path.modules.filter((m) => m.isComplete).length} / {path.modules.length} Modules Complete
+                          </span>
+                        </div>
+
+                        <div className="space-y-3">
+                          {path.modules.map((mod) => (
+                            <div
+                              key={mod.id}
+                              className={`p-4 rounded-xl border transition-all ${
+                                mod.isComplete
+                                  ? 'bg-mint/5 border-mint/30'
+                                  : mod.isUnlocked
+                                  ? 'bg-surface-container-lowest border-primary/30'
+                                  : 'bg-surface-container-high/40 border-outline-variant/20 opacity-75'
+                              }`}
+                            >
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-sm">
+                                      {mod.isComplete
+                                        ? 'check_circle'
+                                        : mod.isFastTracked
+                                        ? 'bolt'
+                                        : mod.isUnlocked
+                                        ? 'lock_open'
+                                        : 'lock'}
+                                    </span>
+                                    <h5 className="font-headline text-sm font-bold text-on-background">
+                                      {mod.title}
+                                    </h5>
+                                    {mod.phase && (
+                                      <span className="text-[10px] bg-surface px-2 py-0.5 rounded font-bold text-on-surface-variant">
+                                        {mod.phase}
+                                      </span>
+                                    )}
+                                    {mod.isOverridden && (
+                                      <span className="text-[10px] bg-secondary/15 text-secondary px-2 py-0.5 rounded font-bold">
+                                        Overridden
+                                      </span>
+                                    )}
+                                    {mod.isFastTracked && (
+                                      <span className="text-[10px] bg-butter/20 text-butter px-2 py-0.5 rounded font-bold">
+                                        Fast-Tracked
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-on-surface-variant mt-1">
+                                    Courses: {mod.completedCourses} / {mod.totalCourses} completed
+                                  </p>
+
+                                  {/* Dynamic Rules / Blockers Breakdown */}
+                                  {mod.dynamicRules?.length > 0 && (
+                                    <div className="mt-2 space-y-1">
+                                      {mod.dynamicRules.map((rule, idx) => (
+                                        <div key={idx} className="flex items-center gap-1.5 text-xs">
+                                          <span className={`material-symbols-outlined text-xs ${rule.met ? 'text-mint' : 'text-blush'}`}>
+                                            {rule.met ? 'check' : 'close'}
+                                          </span>
+                                          <span className={rule.met ? 'text-on-surface' : 'text-blush font-bold'}>
+                                            {rule.description}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {mod.blockedReasons?.length > 0 && !mod.isUnlocked && (
+                                    <div className="mt-2 text-xs text-blush space-y-0.5">
+                                      <p className="font-bold">Blocked by:</p>
+                                      {mod.blockedReasons.map((reason, idx) => (
+                                        <p key={idx} className="pl-2">• {reason}</p>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  {!mod.isUnlocked ? (
+                                    <button
+                                      disabled={actionBusy}
+                                      onClick={() => handleFastTrack(mod.id)}
+                                      className="px-3 py-1.5 rounded-full bg-primary text-on-primary font-headline text-xs font-bold hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+                                      type="button"
+                                    >
+                                      <span className="material-symbols-outlined text-sm">bolt</span>
+                                      Fast-Track Unlock
+                                    </button>
+                                  ) : mod.isOverridden ? (
+                                    <button
+                                      disabled={actionBusy}
+                                      onClick={() => handleRevokeOverride(mod.id)}
+                                      className="px-3 py-1.5 rounded-full bg-surface-container-high text-on-surface-variant hover:text-blush font-headline text-xs font-bold disabled:opacity-50"
+                                      type="button"
+                                    >
+                                      Revoke Override
+                                    </button>
+                                  ) : (
+                                    <span className="text-xs font-bold text-mint flex items-center gap-1">
+                                      <span className="material-symbols-outlined text-sm">check</span>
+                                      Active
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-on-surface-variant text-center py-6">No enrolled career paths found.</p>
+                  )}
+                </div>
+
+                {/* Personalized Recommendations Engine Inspector */}
+                <div className="rounded-3xl bg-surface-container-lowest p-6 shadow-soft space-y-4">
+                  <h3 className="font-headline text-lg font-bold text-on-background flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary">psychology_alt</span>
+                    Dynamic Learning Recommendations for this Student
+                  </h3>
+                  <p className="text-xs text-on-surface-variant">
+                    Generated dynamically based on assessment diagnostic scores, active path gating, and demonstrated skill gaps.
+                  </p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    {progressionData?.recommendations?.length > 0 ? (
+                      progressionData.recommendations.map((rec, i) => (
+                        <div key={i} className="p-4 rounded-2xl bg-surface border border-outline-variant/20 space-y-2">
+                          <div className="flex justify-between items-start gap-2">
+                            <h5 className="font-headline text-sm font-bold text-on-background">{rec.title}</h5>
+                            <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-primary/10 text-primary">
+                              {rec.tag}
+                            </span>
+                          </div>
+                          <p className="text-xs font-body text-on-surface-variant">{rec.reason}</p>
+                          <div className="pt-2 flex justify-between items-center text-[10px] text-on-surface-variant font-bold">
+                            <span>Subject: {rec.subject}</span>
+                            <span className="text-primary">{rec.actionUrl}</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-on-surface-variant italic col-span-2">No active recommendation flags.</p>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 

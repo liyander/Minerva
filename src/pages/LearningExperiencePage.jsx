@@ -11,10 +11,12 @@ import {
   reviewLeaveRequest, reviewProjectMilestone,
   approvePortfolioItem, saveAttendance, saveGatingOverride, saveGrade,
   saveLiveSessionContent, saveModulePrerequisites, searchLearning,
+  fetchGamification, fetchRecommendations, saveDynamicRule, fetchDynamicRules, deleteDynamicRule,
 } from '../services/platform'
 
 const TABS = [
-  ['calendar', 'Calendar', 'calendar_month'], ['search', 'Search', 'search'],
+  ['calendar', 'Calendar', 'calendar_month'], ['mastery', 'Mastery & XP', 'military_tech'],
+  ['search', 'Search', 'search'],
   ['gradebook', 'Gradebook', 'school'], ['projects', 'Projects', 'account_tree'],
   ['portfolio', 'Portfolio', 'work'], ['skills', 'Skill passport', 'verified'],
   ['gating', 'Progression', 'lock_open'],
@@ -57,18 +59,27 @@ export default function LearningExperiencePage() {
   const [portfolioForm, setPortfolioForm] = useState({ title: '', description: '', evidenceUrl: '', skills: '', reflection: '', privacy: 'private' })
   const [skill, setSkill] = useState({ userId: '', skill: '', proficiency: 'beginner', evidenceType: 'demonstrated', evidenceLabel: '', evidenceUrl: '', demonstratedAt: '', expiresAt: '' })
   const [gating, setGating] = useState({ moduleId: '', requires: '', userId: '', reason: '', expiresAt: '' })
+  const [dynamicRuleForm, setDynamicRuleForm] = useState({ moduleId: '', ruleType: 'min_assessment_score', targetId: '', requiredValue: 80 })
+  const [dynamicRulesList, setDynamicRulesList] = useState([])
+  const [gamification, setGamification] = useState(null)
+  const [recommendations, setRecommendations] = useState([])
   const [sessionContent, setSessionContent] = useState({ eventId: '', recordingFileId: '', transcript: '', materials: '', followUp: '' })
 
   const load = useCallback(async () => {
     setError('')
     try {
-      const [eventRows, attendanceRow, grades, projectRows, portfolioRows, skills, shareRows] = await Promise.all([
+      const [eventRows, attendanceRow, grades, projectRows, portfolioRows, skills, shareRows, gameStats, recs] = await Promise.all([
         fetchExperienceEvents(), fetchMyAttendance(), fetchMyGradebook(), fetchLearningProjects(),
         fetchMyPortfolio(), fetchMySkillPassport(), fetchPublicShares(),
+        fetchGamification().catch(() => null),
+        fetchRecommendations().catch(() => ({ recommendations: [] })),
       ])
       setEvents(eventRows); setAttendance(attendanceRow); setGradebook(grades); setProjects(projectRows)
       setPortfolio(portfolioRows); setPassport(skills)
       setShares(shareRows)
+      setGamification(gameStats)
+      setRecommendations(recs?.recommendations || [])
+
       if (manager) {
         const [leaves, reviews] = await Promise.all([fetchLeaveRequests(), fetchPortfolioReview()])
         setLeaveRequests(leaves); setPortfolioReview(reviews)
@@ -76,6 +87,16 @@ export default function LearningExperiencePage() {
     } catch (loadError) { setError(loadError?.message || 'Could not load the learning hub.') }
   }, [manager])
   useEffect(() => { void load() }, [load])
+
+  const loadModuleDynamicRules = async (moduleId) => {
+    if (!moduleId) return
+    try {
+      const res = await fetchDynamicRules(moduleId)
+      setDynamicRulesList(res.rules || [])
+    } catch (e) {
+      console.error(e)
+    }
+  }
 
   const submit = async (work, success) => {
     setBusy(true); setError(''); setMessage('')
@@ -145,7 +166,156 @@ export default function LearningExperiencePage() {
 
         {tab === 'skills' ? <div className="grid gap-5 lg:grid-cols-[1.2fr_.8fr]"><Panel title="Verified skill passport"><div className="space-y-3">{[...(passport.declared || []), ...(passport.evidence || [])].map((item,index) => <article className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-surface-container p-4" key={`${item.skill}-${index}`}><div><h3 className="font-headline font-extrabold">{item.skill}</h3><p className="text-xs text-on-surface-variant">{item.evidence_type || item.evidenceType} · {item.evidence_label || 'Declared profile evidence'}{item.expires_at ? ` · expires ${new Date(item.expires_at).toLocaleDateString()}` : ''}</p></div><span className={`rounded-full px-3 py-1 text-xs font-bold ${item.verified ? 'bg-mint text-on-mint' : 'bg-butter text-on-butter'}`}>{item.proficiency}{item.verified ? ' · verified' : ''}</span></article>)}</div></Panel><div className="space-y-5"><Panel title={manager ? 'Verify skill evidence' : 'Add demonstrated evidence'}><form className="grid gap-3" onSubmit={(e) => { e.preventDefault(); void submit(() => addSkillEvidence(skill), 'Skill evidence added.') }}>{manager ? <input className={input} name="userId" onChange={update(setSkill)} placeholder="Trainee user ID" value={skill.userId}/> : null}{['skill','evidenceLabel','evidenceUrl'].map((name) => <input className={input} key={name} name={name} onChange={update(setSkill)} placeholder={name} value={skill[name]}/>)}<select className={input} name="proficiency" onChange={update(setSkill)} value={skill.proficiency}>{['beginner','intermediate','advanced','expert'].map((value) => <option key={value}>{value}</option>)}</select><div className="grid grid-cols-2 gap-2"><input className={input} name="demonstratedAt" onChange={update(setSkill)} type="date" value={skill.demonstratedAt}/><input className={input} name="expiresAt" onChange={update(setSkill)} type="date" value={skill.expiresAt}/></div><button className={button}>Add evidence</button></form></Panel><Panel title="Share passport"><button className={button} onClick={() => void submit(async () => { const share = await createPublicShare({ type: 'passport' }); await navigator.clipboard?.writeText(`${window.location.origin}${share.path}`); setMessage(`Share link copied: ${window.location.origin}${share.path}`) }, 'Share link created.')} type="button">Create controlled link</button></Panel></div></div> : null}
 
-        {tab === 'gating' ? <div className="grid gap-5 md:grid-cols-2"><Panel title="Configure prerequisites"><form className="grid gap-3" onSubmit={(e) => { e.preventDefault(); void submit(() => saveModulePrerequisites(gating.moduleId, gating.requires.split(',').map((id) => id.trim()).filter(Boolean)), 'Prerequisites saved.') }}><input className={input} name="moduleId" onChange={update(setGating)} placeholder="Module ID" value={gating.moduleId}/><input className={input} name="requires" onChange={update(setGating)} placeholder="Required module IDs, comma separated" value={gating.requires}/><button className={button}>Save rules</button></form></Panel>{admin ? <Panel title="Administrative unlock override"><form className="grid gap-3" onSubmit={(e) => { e.preventDefault(); void submit(() => saveGatingOverride(gating.moduleId, gating.userId, { granted: true, reason: gating.reason, expiresAt: gating.expiresAt || null }), 'Override granted.') }}><input className={input} name="moduleId" onChange={update(setGating)} placeholder="Module ID" value={gating.moduleId}/><input className={input} name="userId" onChange={update(setGating)} placeholder="Trainee user ID" value={gating.userId}/><input className={input} name="reason" onChange={update(setGating)} placeholder="Reason" value={gating.reason}/><input className={input} name="expiresAt" onChange={update(setGating)} type="datetime-local" value={gating.expiresAt}/><button className={button}>Grant override</button></form></Panel> : null}</div> : null}
+        {tab === 'mastery' ? (
+          <div className="space-y-6">
+            {/* Gamification Tier Banner */}
+            <div className="grid gap-5 md:grid-cols-3">
+              <Panel title="Learner Tier & Level">
+                <div className="flex flex-col items-center justify-center p-4 text-center">
+                  <span className="material-symbols-outlined text-5xl text-primary mb-2">
+                    {gamification?.tierIcon || 'military_tech'}
+                  </span>
+                  <p className="text-2xl font-extrabold">{gamification?.currentTier || 'Novice'}</p>
+                  <p className="text-xs text-on-surface-variant mt-1">Level {gamification?.level || 1} · {gamification?.totalXp || 0} Total XP</p>
+                  {gamification?.nextTier && (
+                    <div className="w-full mt-4 space-y-1">
+                      <div className="flex justify-between text-[10px] font-bold text-on-surface-variant">
+                        <span>Next: {gamification.nextTier}</span>
+                        <span>{gamification.progressToNextTier}%</span>
+                      </div>
+                      <div className="w-full h-2 bg-surface-container-high rounded-full overflow-hidden">
+                        <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${gamification.progressToNextTier}%` }}></div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Panel>
+
+              <Panel title="Active Streak">
+                <div className="flex flex-col justify-between h-full p-2">
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-4xl text-butter">local_fire_department</span>
+                    <div>
+                      <p className="text-3xl font-extrabold">{gamification?.streakDays || 0} Days</p>
+                      <p className="text-xs text-on-surface-variant">Active learning streak</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-outline-variant text-xs text-on-surface-variant flex justify-between">
+                    <span>XP Multiplier:</span>
+                    <span className="font-bold text-primary">{gamification?.streakMultiplier || 1.0}x</span>
+                  </div>
+                </div>
+              </Panel>
+
+              <Panel title="XP Breakdown">
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between"><span>Courses:</span><span className="font-bold">{gamification?.roomXp || 0} XP</span></div>
+                  <div className="flex justify-between"><span>Assessments:</span><span className="font-bold">{gamification?.assessmentXp || 0} XP</span></div>
+                  <div className="flex justify-between"><span>Projects:</span><span className="font-bold">{gamification?.projectXp || 0} XP</span></div>
+                  <div className="flex justify-between"><span>Attendance:</span><span className="font-bold">{gamification?.attendanceXp || 0} XP</span></div>
+                </div>
+              </Panel>
+            </div>
+
+            {/* Milestones & Badges */}
+            <Panel title="Milestones & Badges">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                {gamification?.allMilestones?.map((m) => (
+                  <div key={m.key} className={`p-3 rounded-2xl border text-center transition-all ${m.unlocked ? 'bg-primary/5 border-primary/30' : 'bg-surface-container/40 border-outline-variant/10 opacity-40'}`}>
+                    <span className={`material-symbols-outlined text-2xl mb-1 ${m.unlocked ? 'text-primary' : 'text-on-surface-variant'}`}>{m.icon}</span>
+                    <p className="font-headline text-xs font-bold truncate">{m.title}</p>
+                    <p className="text-[10px] text-on-surface-variant mt-0.5">{m.unlocked ? `+${m.xp} XP` : 'Locked'}</p>
+                  </div>
+                ))}
+              </div>
+            </Panel>
+
+            {/* Personalized Recommendations */}
+            <Panel title="Dynamic Recommendations">
+              <div className="grid gap-3 md:grid-cols-2">
+                {recommendations.length ? recommendations.map((rec, i) => (
+                  <article className="rounded-2xl bg-surface-container p-4 space-y-2" key={i}>
+                    <div className="flex justify-between items-start gap-2">
+                      <h3 className="font-headline font-extrabold text-sm">{rec.title}</h3>
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary uppercase">{rec.tag}</span>
+                    </div>
+                    <p className="text-xs text-on-surface-variant">{rec.reason}</p>
+                    <a className="inline-block mt-2 text-xs font-bold text-primary" href={rec.actionUrl}>Go to activity →</a>
+                  </article>
+                )) : <p className="col-span-full py-4 text-center text-sm text-on-surface-variant">All recommendations completed!</p>}
+              </div>
+            </Panel>
+          </div>
+        ) : null}
+
+        {tab === 'gating' ? <div className="space-y-6">
+          <div className="grid gap-5 md:grid-cols-2">
+            <Panel title="Configure static prerequisites">
+              <form className="grid gap-3" onSubmit={(e) => { e.preventDefault(); void submit(() => saveModulePrerequisites(gating.moduleId, gating.requires.split(',').map((id) => id.trim()).filter(Boolean)), 'Prerequisites saved.') }}>
+                <input className={input} name="moduleId" onChange={update(setGating)} placeholder="Module ID" value={gating.moduleId}/>
+                <input className={input} name="requires" onChange={update(setGating)} placeholder="Required module IDs, comma separated" value={gating.requires}/>
+                <button className={button}>Save rules</button>
+              </form>
+            </Panel>
+
+            {admin ? <Panel title="Administrative unlock override">
+              <form className="grid gap-3" onSubmit={(e) => { e.preventDefault(); void submit(() => saveGatingOverride(gating.moduleId, gating.userId, { granted: true, reason: gating.reason, expiresAt: gating.expiresAt || null }), 'Override granted.') }}>
+                <input className={input} name="moduleId" onChange={update(setGating)} placeholder="Module ID" value={gating.moduleId}/>
+                <input className={input} name="userId" onChange={update(setGating)} placeholder="Trainee user ID" value={gating.userId}/>
+                <input className={input} name="reason" onChange={update(setGating)} placeholder="Reason" value={gating.reason}/>
+                <input className={input} name="expiresAt" onChange={update(setGating)} type="datetime-local" value={gating.expiresAt}/>
+                <button className={button}>Grant override</button>
+              </form>
+            </Panel> : null}
+          </div>
+
+          {manager ? (
+            <Panel title="Configure Dynamic Progression Rules (Score Thresholds & Fast-Tracking)">
+              <div className="grid gap-5 lg:grid-cols-[1fr_1fr]">
+                <form className="grid gap-3" onSubmit={(e) => {
+                  e.preventDefault();
+                  void submit(async () => {
+                    await saveDynamicRule(dynamicRuleForm.moduleId, dynamicRuleForm);
+                    await loadModuleDynamicRules(dynamicRuleForm.moduleId);
+                  }, 'Dynamic rule created.');
+                }}>
+                  <input className={input} name="moduleId" onChange={update(setDynamicRuleForm)} placeholder="Module ID" required value={dynamicRuleForm.moduleId}/>
+                  <select className={input} name="ruleType" onChange={update(setDynamicRuleForm)} value={dynamicRuleForm.ruleType}>
+                    <option value="min_assessment_score">Min Assessment Score %</option>
+                    <option value="diagnostic_bypass">Diagnostic Pre-test Fast-Track %</option>
+                    <option value="min_assignment_score">Min Assignment Score</option>
+                    <option value="skill_level">Required Skill Level (1-4)</option>
+                  </select>
+                  <input className={input} name="targetId" onChange={update(setDynamicRuleForm)} placeholder="Target Assessment ID / Skill Name (Optional)" value={dynamicRuleForm.targetId}/>
+                  <input className={input} name="requiredValue" onChange={update(setDynamicRuleForm)} placeholder="Required Value (e.g. 80)" required type="number" value={dynamicRuleForm.requiredValue}/>
+                  <div className="flex gap-2">
+                    <button className={button}>Add dynamic rule</button>
+                    <button className="rounded-full bg-surface-container-high px-4 py-2 text-xs font-bold" type="button" onClick={() => void loadModuleDynamicRules(dynamicRuleForm.moduleId)}>
+                      Inspect module rules
+                    </button>
+                  </div>
+                </form>
+
+                <div className="space-y-2">
+                  <h4 className="font-headline text-xs font-bold uppercase text-on-surface-variant">Configured Dynamic Rules for Module</h4>
+                  {dynamicRulesList.length ? dynamicRulesList.map((r) => (
+                    <div key={r.id} className="flex justify-between items-center p-3 rounded-xl bg-surface-container text-xs">
+                      <div>
+                        <p className="font-bold">{r.rule_type}: {r.required_value}{r.rule_type.includes('score') || r.rule_type.includes('bypass') ? '%' : ''}</p>
+                        {r.target_id && <p className="text-[10px] text-on-surface-variant">Target: {r.target_id}</p>}
+                      </div>
+                      <button className="text-xs text-error font-bold" onClick={() => void submit(async () => { await deleteDynamicRule(r.module_id, r.id); await loadModuleDynamicRules(r.module_id); }, 'Rule deleted.')} type="button">
+                        Delete
+                      </button>
+                    </div>
+                  )) : (
+                    <p className="text-xs text-on-surface-variant italic">Enter a module ID and click "Inspect module rules" or add a new rule.</p>
+                  )}
+                </div>
+              </div>
+            </Panel>
+          ) : null}
+        </div> : null}
       </div>
     </main>
   )

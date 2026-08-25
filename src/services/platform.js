@@ -110,6 +110,21 @@ export const saveGatingOverride = (moduleId, userId, payload) =>
   apiFetch(`/learning/modules/${moduleId}/override/${userId}`, { method: 'PUT', ...json(payload) })
 export const fetchSkillGap = (params) => apiFetch(`/learning/skill-gap${query(params)}`)
 
+/* ------------------------------------------- dynamic progression & gamification --- */
+export const fetchDynamicRules = (moduleId) => apiFetch(`/learning/modules/${moduleId}/dynamic-rules`)
+export const saveDynamicRule = (moduleId, payload) =>
+  apiFetch(`/learning/modules/${moduleId}/dynamic-rules`, { method: 'POST', ...json(payload) })
+export const deleteDynamicRule = (moduleId, ruleId) =>
+  apiFetch(`/learning/modules/${moduleId}/dynamic-rules/${ruleId}`, { method: 'DELETE' })
+export const fetchGamification = (userId) =>
+  apiFetch(userId ? `/learning/gamification/${userId}` : '/learning/gamification/me')
+export const fetchRecommendations = (userId) =>
+  apiFetch(userId ? `/learning/recommendations/${userId}` : '/learning/recommendations/me')
+export const fetchStudentProgression = (userId) =>
+  apiFetch(`/learning/admin/student-progression/${userId}`)
+export const fastTrackModule = (userId, payload) =>
+  apiFetch(`/learning/admin/student-progression/${userId}/fast-track`, { method: 'POST', ...json(payload) })
+
 /* -------------------------------------------------- learning experience --- */
 export const fetchExperienceEvents = (params) => apiFetch(`/experience/events${query(params)}`)
 export const createExperienceEvent = (payload) => apiFetch('/experience/events', { method: 'POST', ...json(payload) })

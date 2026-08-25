@@ -54,7 +54,7 @@ function newId() {
 
 function safeName(name) {
   return String(name || 'file')
-    .replace(/[^\w.\-]+/g, '_')
+    .replace(/[^\w.-]+/g, '_')
     .slice(-120)
 }
 

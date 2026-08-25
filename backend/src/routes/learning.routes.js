@@ -1,19 +1,28 @@
 import { Router } from 'express'
 import { pool } from '../db/pool.js'
 import { authenticate, requireAdmin, requireTrainer } from '../middleware/auth.js'
+import {
+  evaluateDynamicModuleGating,
+  calculateGamificationStats,
+  generatePersonalizedRecommendations,
+  getStallingAndRiskMetrics,
+  ensureProgressionTables,
+} from '../services/dynamicProgression.service.js'
 
 const router = Router()
 
 router.use(authenticate)
 
-/* -------------------------------------------------------- prerequisites --- */
+/* -------------------------------------------------------- prerequisites & dynamic progression --- */
 
 /**
- * Module gating. A module unlocks once every prerequisite module is complete,
- * where "complete" means all of its courses are finished. Explicit prerequisite
- * rows take priority; without them a path falls back to sequential order.
+ * Module gating. A module unlocks once every prerequisite module is complete
+ * and dynamic progression rules (minimum assessment/assignment score, diagnostic bypass)
+ * are satisfied.
  */
 router.get('/paths/:pathId/gating', async (req, res) => {
+  await ensureProgressionTables()
+
   const [modules] = await pool.query(
     `SELECT id, title, phase, sort_order FROM career_path_modules
      WHERE career_path_id = ? ORDER BY sort_order, id`,
@@ -66,34 +75,51 @@ router.get('/paths/:pathId/gating', async (req, res) => {
     return courses.every((roomId) => completedCourses.has(roomId))
   }
 
-  const result = modules.map((module, index) => {
-    const explicit = prereqsByModule.get(module.id) || []
-    // No explicit rule: require the immediately preceding module.
-    const required = explicit.length
-      ? explicit
-      : index > 0
-        ? [modules[index - 1].id]
-        : []
+  const result = await Promise.all(
+    modules.map(async (module, index) => {
+      const explicit = prereqsByModule.get(module.id) || []
+      const required = explicit.length
+        ? explicit
+        : index > 0
+          ? [modules[index - 1].id]
+          : []
 
-    const outstanding = required.filter((moduleId) => !isModuleComplete(moduleId))
-    const courses = coursesByModule.get(module.id) || []
-    const done = courses.filter((roomId) => completedCourses.has(roomId)).length
+      const outstanding = required.filter((moduleId) => !isModuleComplete(moduleId))
+      const courses = coursesByModule.get(module.id) || []
+      const done = courses.filter((roomId) => completedCourses.has(roomId)).length
 
-    return {
-      id: module.id,
-      title: module.title,
-      phase: module.phase,
-      totalCourses: courses.length,
-      completedCourses: done,
-      isComplete: isModuleComplete(module.id),
-      requires: required,
-      locked: outstanding.length > 0 && !overrides.has(module.id),
-      overridden: overrides.has(module.id),
-      blockedBy: outstanding.map(
-        (moduleId) => modules.find((row) => row.id === moduleId)?.title || moduleId,
-      ),
-    }
-  })
+      // Evaluate dynamic progression rules (mastery/assessment score thresholds, diagnostic bypass)
+      const dynamicEvaluation = await evaluateDynamicModuleGating(req.user.id, module.id)
+
+      const staticBlocked = outstanding.length > 0
+      const dynamicBlocked = dynamicEvaluation.hasDynamicRules && !dynamicEvaluation.unlocked
+      const isOverridden = overrides.has(module.id)
+      const isFastTracked = dynamicEvaluation.fastTracked
+
+      const allBlockers = [
+        ...outstanding.map(
+          (moduleId) => modules.find((row) => row.id === moduleId)?.title || moduleId,
+        ),
+        ...dynamicEvaluation.blockedReasons,
+      ]
+
+      return {
+        id: module.id,
+        title: module.title,
+        phase: module.phase,
+        totalCourses: courses.length,
+        completedCourses: done,
+        isComplete: isModuleComplete(module.id),
+        requires: required,
+        locked: !isOverridden && !isFastTracked && (staticBlocked || dynamicBlocked),
+        overridden: isOverridden,
+        fastTracked: isFastTracked,
+        hasDynamicRules: dynamicEvaluation.hasDynamicRules,
+        dynamicRules: dynamicEvaluation.rulesEvaluated,
+        blockedBy: isFastTracked ? [] : allBlockers,
+      }
+    }),
+  )
 
   return res.json({ modules: result })
 })
@@ -113,6 +139,7 @@ router.put('/modules/:moduleId/override/:userId', requireAdmin, async (req, res)
 
 /** Enforces module gates even when a trainee opens a course URL directly. */
 router.get('/courses/:courseId/access', async (req, res) => {
+  await ensureProgressionTables()
   const [rooms] = await pool.query('SELECT id FROM rooms WHERE id=? OR slug=? LIMIT 1', [req.params.courseId, req.params.courseId])
   if (!rooms.length) return res.status(404).json({ message: 'Course not found' })
   const [modules] = await pool.query(
@@ -122,6 +149,19 @@ router.get('/courses/:courseId/access', async (req, res) => {
   for (const module of modules) {
     const [override] = await pool.query(`SELECT 1 FROM module_gating_overrides WHERE module_id=? AND user_id=? AND (expires_at IS NULL OR expires_at>NOW()) LIMIT 1`, [module.id, req.user.id])
     if (override.length) continue
+
+    // Dynamic progression rules
+    const dynamicEval = await evaluateDynamicModuleGating(req.user.id, module.id)
+    if (dynamicEval.fastTracked) continue
+    if (dynamicEval.hasDynamicRules && !dynamicEval.unlocked) {
+      return res.json({
+        allowed: false,
+        moduleId: module.id,
+        moduleTitle: module.title,
+        blockedBy: dynamicEval.blockedReasons,
+      })
+    }
+
     let [required] = await pool.query('SELECT requires_module_id id FROM module_prerequisites WHERE module_id=?', [module.id])
     if (!required.length) {
       const [previous] = await pool.query('SELECT id FROM career_path_modules WHERE career_path_id=? AND sort_order < ? ORDER BY sort_order DESC LIMIT 1', [module.career_path_id, module.sort_order])
@@ -140,6 +180,170 @@ router.get('/courses/:courseId/access', async (req, res) => {
     if (blocked.length) return res.json({ allowed: false, moduleId: module.id, moduleTitle: module.title, blockedBy: blocked.map((row) => row.title) })
   }
   res.json({ allowed: true })
+})
+
+/* ------------------------------------------------ dynamic progression rules CRUD --- */
+
+router.get('/modules/:moduleId/dynamic-rules', requireTrainer, async (req, res) => {
+  await ensureProgressionTables()
+  const [rules] = await pool.query(
+    `SELECT id, module_id, rule_type, target_id, required_value, config_json, created_at
+     FROM dynamic_progression_rules WHERE module_id = ? ORDER BY id`,
+    [req.params.moduleId],
+  )
+  res.json({ rules })
+})
+
+router.post('/modules/:moduleId/dynamic-rules', requireTrainer, async (req, res) => {
+  await ensureProgressionTables()
+  const { ruleType = 'min_assessment_score', targetId = null, requiredValue = 80 } = req.body || {}
+
+  const [result] = await pool.query(
+    `INSERT INTO dynamic_progression_rules (module_id, rule_type, target_id, required_value)
+     VALUES (?, ?, ?, ?)`,
+    [req.params.moduleId, ruleType, targetId, Number(requiredValue)],
+  )
+  res.json({ id: result.insertId, saved: true })
+})
+
+router.delete('/modules/:moduleId/dynamic-rules/:ruleId', requireTrainer, async (req, res) => {
+  await ensureProgressionTables()
+  await pool.query(
+    `DELETE FROM dynamic_progression_rules WHERE id = ? AND module_id = ?`,
+    [req.params.ruleId, req.params.moduleId],
+  )
+  res.json({ deleted: true })
+})
+
+/* ------------------------------------------------ gamification & milestones --- */
+
+router.get('/gamification/me', async (req, res) => {
+  const stats = await calculateGamificationStats(req.user.id)
+  res.json(stats)
+})
+
+router.get('/gamification/:userId', async (req, res) => {
+  const targetId = Number(req.params.userId) || req.user.id
+  const stats = await calculateGamificationStats(targetId)
+  res.json(stats)
+})
+
+/* ------------------------------------------------ personalized recommendations --- */
+
+router.get('/recommendations/me', async (req, res) => {
+  const recommendations = await generatePersonalizedRecommendations(req.user.id)
+  res.json({ recommendations })
+})
+
+router.get('/recommendations/:userId', async (req, res) => {
+  const targetId = Number(req.params.userId) || req.user.id
+  const recommendations = await generatePersonalizedRecommendations(targetId)
+  res.json({ recommendations })
+})
+
+/* ------------------------------------------------ admin student progression monitor --- */
+
+router.get('/admin/student-progression/:userId', requireAdmin, async (req, res) => {
+  await ensureProgressionTables()
+  const targetUserId = Number(req.params.userId)
+
+  // 1. User details
+  const [users] = await pool.query('SELECT id, username, first_name, last_name, role, is_active FROM users WHERE id = ?', [targetUserId])
+  if (!users.length) return res.status(404).json({ message: 'User not found' })
+
+  // 2. Gamification stats
+  const gamification = await calculateGamificationStats(targetUserId)
+
+  // 3. Stalling / Risk metrics
+  const risk = await getStallingAndRiskMetrics(targetUserId)
+
+  // 4. Recommendations
+  const recommendations = await generatePersonalizedRecommendations(targetUserId)
+
+  // 5. Active path progress & gating breakdown
+  const [enrolledPaths] = await pool.query(
+    `SELECT e.career_path_id, cp.title AS path_title
+     FROM course_enrollments e
+     JOIN career_paths cp ON cp.id = e.career_path_id
+     WHERE e.user_id = ?`,
+    [targetUserId],
+  )
+
+  const pathProgress = []
+  for (const path of enrolledPaths) {
+    const [modules] = await pool.query(
+      `SELECT m.id, m.title, m.phase, m.sort_order
+       FROM career_path_modules m
+       WHERE m.career_path_id = ?
+       ORDER BY m.sort_order, m.id`,
+      [path.career_path_id],
+    )
+
+    const moduleStatuses = []
+    for (const mod of modules) {
+      const dynamicStatus = await evaluateDynamicModuleGating(targetUserId, mod.id)
+      const [overrides] = await pool.query(
+        `SELECT id, reason, expires_at FROM module_gating_overrides WHERE module_id = ? AND user_id = ?`,
+        [mod.id, targetUserId],
+      )
+
+      const [courseProgress] = await pool.query(
+        `SELECT mr.room_id, r.title, (p.completed_at IS NOT NULL) AS is_completed
+         FROM career_path_module_rooms mr
+         JOIN rooms r ON r.id = mr.room_id
+         LEFT JOIN user_room_progress p ON p.room_id = mr.room_id AND p.user_id = ?
+         WHERE mr.module_id = ?`,
+        [targetUserId, mod.id],
+      )
+
+      const totalCourses = courseProgress.length
+      const completedCourses = courseProgress.filter((c) => Boolean(c.is_completed)).length
+
+      moduleStatuses.push({
+        id: mod.id,
+        title: mod.title,
+        phase: mod.phase,
+        totalCourses,
+        completedCourses,
+        isComplete: totalCourses > 0 && completedCourses === totalCourses,
+        isUnlocked: Boolean(overrides.length) || dynamicStatus.unlocked,
+        isOverridden: overrides.length > 0,
+        isFastTracked: dynamicStatus.fastTracked,
+        blockedReasons: dynamicStatus.blockedReasons,
+        dynamicRules: dynamicStatus.rulesEvaluated,
+        courses: courseProgress,
+      })
+    }
+
+    pathProgress.push({
+      pathId: path.career_path_id,
+      pathTitle: path.path_title,
+      modules: moduleStatuses,
+    })
+  }
+
+  res.json({
+    user: users[0],
+    gamification,
+    risk,
+    recommendations,
+    pathProgress,
+  })
+})
+
+router.post('/admin/student-progression/:userId/fast-track', requireAdmin, async (req, res) => {
+  await ensureProgressionTables()
+  const { moduleId, reason = 'Admin fast-track override' } = req.body || {}
+  if (!moduleId) return res.status(400).json({ message: 'Module ID is required' })
+
+  await pool.query(
+    `INSERT INTO module_gating_overrides (module_id, user_id, granted_by, reason)
+     VALUES (?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE granted_by = VALUES(granted_by), reason = VALUES(reason)`,
+    [moduleId, req.params.userId, req.user.id, reason],
+  )
+
+  res.json({ fastTracked: true, moduleId })
 })
 
 router.put('/modules/:moduleId/prerequisites', requireTrainer, async (req, res) => {

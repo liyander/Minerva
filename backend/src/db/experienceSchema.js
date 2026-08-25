@@ -232,6 +232,49 @@ export const EXPERIENCE_TABLE_DDL = `
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   );
+
+  CREATE TABLE IF NOT EXISTS dynamic_progression_rules (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    module_id VARCHAR(191) NOT NULL,
+    rule_type VARCHAR(50) NOT NULL DEFAULT 'min_assessment_score',
+    target_id VARCHAR(191) NULL,
+    required_value DECIMAL(10,2) NOT NULL DEFAULT 80.00,
+    config_json LONGTEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_progression_module (module_id),
+    FOREIGN KEY (module_id) REFERENCES career_path_modules(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS user_milestone_achievements (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    milestone_key VARCHAR(100) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    category VARCHAR(50) DEFAULT 'general',
+    badge_icon VARCHAR(80) DEFAULT 'military_tech',
+    xp_awarded INT DEFAULT 0,
+    achieved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_user_milestone (user_id, milestone_key),
+    INDEX idx_user_milestones (user_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS user_progression_recommendations (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    item_type VARCHAR(50) NOT NULL,
+    item_id VARCHAR(191) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    reason VARCHAR(500) NOT NULL,
+    action_url VARCHAR(255) NOT NULL,
+    status VARCHAR(30) DEFAULT 'suggested',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_user_recommendations (user_id, status),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
 `
 
 export const EXPERIENCE_TABLES = [
@@ -239,6 +282,7 @@ export const EXPERIENCE_TABLES = [
   'live_session_content', 'gradebook_items', 'gradebook_entries', 'gradebook_history',
   'learning_projects', 'learning_project_members', 'project_milestones', 'portfolio_items',
   'skill_evidence', 'public_profile_shares',
+  'dynamic_progression_rules', 'user_milestone_achievements', 'user_progression_recommendations',
 ]
 
 export const EXPERIENCE_COLUMN_MIGRATIONS = [
