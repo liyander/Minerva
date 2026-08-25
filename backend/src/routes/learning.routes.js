@@ -243,7 +243,7 @@ router.get('/recommendations/:userId', async (req, res) => {
 
 /* ------------------------------------------------ admin student progression monitor --- */
 
-router.get('/admin/student-progression/:userId', requireAdmin, async (req, res) => {
+router.get('/admin/student-progression/:userId', requireTrainer, async (req, res) => {
   await ensureProgressionTables()
   const targetUserId = Number(req.params.userId)
 
